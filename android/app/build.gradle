@@ -1,0 +1,44 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'com.natanel.sonolsync'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId "com.natanel.sonolsync"
+        minSdk 26
+        targetSdk 34
+        versionCode 6
+        versionName "5.0"
+
+        // Default configurations from gradle.properties (can be overridden in local.properties)
+        buildConfigField "String", "SERVER_URL", "\"${project.findProperty('FULLTANK_SERVER_URL') ?: 'http://127.0.0.1:5088'}\""
+        buildConfigField "String", "SECRET_TOKEN", "\"${project.findProperty('FULLTANK_SECRET_TOKEN') ?: 'demo_token'}\""
+        buildConfigField "String", "SPREADSHEET_URL", "\"${project.findProperty('FULLTANK_SPREADSHEET_URL') ?: ''}\""
+    }
+
+    buildFeatures {
+        buildConfig true
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+}
+
+dependencies {
+    implementation 'androidx.appcompat:appcompat:1.6.1'
+    implementation 'com.google.android.material:material:1.11.0'
+    implementation 'androidx.swiperefreshlayout:swiperefreshlayout:1.1.0'
+    implementation 'androidx.car.app:app:1.4.0'
+    implementation 'androidx.car.app:app-projected:1.4.0'
+}

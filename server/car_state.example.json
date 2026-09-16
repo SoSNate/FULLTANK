@@ -1,0 +1,48 @@
+{
+  "active_plate": "12-345-67",
+  "vehicles": [
+    {
+      "plate": "12-345-67",
+      "car_model": "רכב לדוגמה (שנה)",
+      "tank_capacity": 55.0,
+      "full_tank_refuel_km": 150000,
+      "current_odometer": 150000,
+      "avg_km_per_liter": 14.0,
+      "city_km_per_liter": 8.0,
+      "test_expiry_date": "2027-01-01",
+      "tire_size": "195/65R15",
+      "last_full_refuel_date": "01/01/2027",
+      "target_odometer_goal": 500000
+    }
+  ],
+  "insurance": {
+    "12-345-67": {
+      "plate": "12-345-67",
+      "insurance_type": "חובה + צד ג'",
+      "company": "חברת ביטוח לדוגמה",
+      "start_date": "2027-01-01",
+      "end_date": "2028-01-01",
+      "annual_cost": 3000.0,
+      "monthly_cost": 250.0,
+      "policy_number": "POL-EXAMPLE-12345",
+      "notes": "שירותי דרך וגרירה"
+    }
+  },
+  "maintenance": {
+    "12-345-67": [
+      {
+        "id": 1,
+        "date": "2027-01-01",
+        "km": 150000,
+        "service_type": "טיפול תקופתי 15,000 ק\"מ",
+        "description": "החלפת שמן מנוע ופילטרים",
+        "cost": 500.0,
+        "garage": "מוסך מורשה",
+        "next_service_km": 165000,
+        "receipt_url": "",
+        "parts_detail": "שמן מנוע סינטטי מלא ומסננים",
+        "category": "תחזוקה שוטפת"
+      }
+    ]
+  }
+}

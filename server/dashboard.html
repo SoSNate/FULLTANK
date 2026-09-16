@@ -1,0 +1,1457 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>פוול טנק • Full Tank - ניהול תדלוק, תחזוקה, ביטוח והוצאות רכב</title>
+  <link rel="icon" type="image/png" href="/logo.png">
+  
+  <!-- Google Fonts: Heebo & Assistant for crisp Hebrew typography -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Assistant:wght@300;400;500;600;700;800&family=Heebo:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  
+  <!-- FontAwesome 6 for automotive & utility icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  
+  <!-- Chart.js for smooth financial-grade interactive charts -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Assistant', 'Heebo', 'system-ui', 'sans-serif'],
+            mono: ['Heebo', 'monospace']
+          },
+          colors: {
+            metal: {
+              950: '#07090e',
+              900: '#0d1117',
+              850: '#131822',
+              800: '#1b2230',
+              700: '#283347',
+              600: '#3d4b66',
+              300: '#94a3b8',
+              100: '#e2e8f0'
+            },
+            bordeaux: {
+              950: '#2d0408',
+              900: '#4a080f',
+              800: '#720d18',
+              700: '#9b1120',
+              600: '#b91c1c',
+              500: '#dc2626',
+              400: '#ef4444'
+            },
+            cyanGlow: '#06b6d4',
+            emeraldGlow: '#10b981',
+            amberGlow: '#f59e0b'
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    body {
+      background-color: #07090e;
+      color: #f1f5f9;
+      font-family: 'Assistant', sans-serif;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+      overflow-x: hidden;
+    }
+    
+    .sheet-transition {
+      transition: transform 0.32s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.25s ease;
+    }
+
+    .metallic-card {
+      background: linear-gradient(145deg, rgba(27, 34, 48, 0.85) 0%, rgba(15, 20, 29, 0.95) 100%);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      backdrop-filter: blur(12px);
+    }
+
+    .metallic-bordeaux {
+      background: linear-gradient(135deg, #720d18 0%, #3e070e 100%);
+      border: 1px solid rgba(239, 68, 68, 0.35);
+      box-shadow: 0 8px 24px -6px rgba(185, 28, 28, 0.45);
+    }
+
+    @keyframes pulse-glow {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.55; transform: scale(0.92); }
+    }
+    .pulse-dot {
+      animation: pulse-glow 2s infinite ease-in-out;
+    }
+
+    ::-webkit-scrollbar {
+      display: none;
+    }
+    * {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+    html {
+      font-size: 18px;
+    }
+    @media (min-width: 440px) {
+      html {
+        font-size: 19px;
+      }
+    }
+  </style>
+</head>
+
+<body class="min-h-screen flex justify-center items-start antialiased selection:bg-bordeaux-600">
+
+  <!-- Main Mobile Container -->
+  <div id="appContainer" class="w-full max-w-[480px] min-h-screen relative flex flex-col bg-metal-950 pb-28 shadow-2xl border-x border-metal-850 text-slate-100">
+    
+    <!-- Sticky Top Bar -->
+    <header class="sticky top-0 z-30 pt-3 pb-2.5 px-4 bg-metal-950/95 backdrop-blur-md border-b border-metal-850 flex flex-col gap-2.5">
+      <div class="flex items-center justify-between">
+        <!-- App Title & Clickable License Plate Badge -->
+        <div class="flex items-center gap-3">
+          <img src="/logo.png" alt="פוול טנק" class="w-11 h-11 rounded-2xl border-2 border-metal-700/80 shadow-md shadow-bordeaux-950/60 object-cover shrink-0">
+          <div>
+            <h1 id="headerCarName" class="font-black text-sm text-white tracking-wide leading-tight">פוול טנק</h1>
+            <!-- Interactive Plate Switcher Badge -->
+            <button onclick="openCarSettingsModal()" title="החלף רכב / הגדרות" class="mt-1 inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-lg bg-amber-400 text-black font-black font-mono text-xs border border-amber-500 shadow-sm hover:brightness-105 active:scale-95 transition cursor-pointer">
+              <span id="headerPlateBadge">86-369-79</span>
+              <i class="fa-solid fa-chevron-down text-[9px] opacity-70"></i>
+            </button>
+          </div>
+        </div>
+
+        <!-- Header Action Buttons -->
+        <div class="flex items-center gap-2">
+          <button onclick="openGoogleSheets()" title="פתח Google Sheets" class="w-10 h-10 rounded-2xl bg-metal-850 hover:bg-metal-800 active:scale-95 transition flex items-center justify-center text-emerald-400 hover:text-white border border-metal-700/50 shadow-sm">
+            <i class="fa-solid fa-table text-sm"></i>
+          </button>
+          <button id="refreshBtn" onclick="triggerManualSync()" title="רענן נתונים" class="w-10 h-10 rounded-2xl bg-metal-850 hover:bg-metal-800 active:scale-95 transition flex items-center justify-center text-metal-300 hover:text-white border border-metal-700/50 shadow-sm">
+            <i id="syncIcon" class="fa-solid fa-rotate text-sm"></i>
+          </button>
+        </div>
+      </div>
+
+      <!-- Top Navigation Tabs -->
+      <nav class="grid grid-cols-3 p-1 bg-metal-900/90 rounded-2xl border border-metal-800/90">
+        <button id="navTabFuel" onclick="switchNavTab('fuel')" class="py-2 px-1 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 bg-bordeaux-800 text-white shadow-sm shadow-bordeaux-950">
+          <i class="fa-solid fa-gas-pump text-[11px]"></i>
+          <span>דלק וצריכה</span>
+        </button>
+        <button id="navTabMaint" onclick="switchNavTab('maint')" class="py-2 px-1 rounded-xl text-xs font-medium text-metal-300 hover:text-white transition flex items-center justify-center gap-1.5">
+          <i class="fa-solid fa-shield-heart text-[11px]"></i>
+          <span>תחזוקה וביטוח</span>
+        </button>
+        <button id="navTabTco" onclick="switchNavTab('tco')" class="py-2 px-1 rounded-xl text-xs font-medium text-metal-300 hover:text-white transition flex items-center justify-center gap-1.5">
+          <i class="fa-solid fa-coins text-[11px]"></i>
+          <span>מעטפת הוצאות</span>
+        </button>
+      </nav>
+    </header>
+
+    <!-- Simulated SMS Incoming Notification Toast -->
+    <div id="smsNotificationToast" class="hidden mx-3 mt-2.5 p-3 rounded-2xl bg-gradient-to-r from-metal-900 to-metal-850 border border-bordeaux-700/70 shadow-xl shadow-bordeaux-950/50 flex items-center justify-between animate-pulse">
+      <div class="flex items-center gap-2.5 overflow-hidden">
+        <div class="w-8 h-8 rounded-xl bg-bordeaux-700 flex items-center justify-center text-white shrink-0">
+          <i class="fa-solid fa-comment-sms text-sm"></i>
+        </div>
+        <div class="text-right truncate">
+          <div class="flex items-center gap-1.5">
+            <span class="text-xs font-bold text-bordeaux-400">Sonol • זוהה תדלוק</span>
+            <span class="text-[10px] text-metal-400">עכשיו</span>
+          </div>
+          <p id="smsToastDetails" class="text-[11px] text-metal-200 truncate">סונול צפריה • 91.30 ₪ • לחץ לתיעוד ק"מ</p>
+        </div>
+      </div>
+      <button onclick="openOdometerSheet(true)" class="shrink-0 bg-bordeaux-600 hover:bg-bordeaux-500 text-white text-xs px-3 py-1.5 rounded-xl font-bold transition">
+        הזן ק"מ
+      </button>
+    </div>
+
+    <!-- ================= VIEW 1: FUEL & CONSUMPTION ================= -->
+    <main id="viewFuel" class="flex-1 px-3.5 pt-3 space-y-3.5">
+
+      <!-- Hero Card: Consumption & Service Alert -->
+      <section class="metallic-card rounded-3xl p-4 relative overflow-hidden border border-metal-700/50">
+        <div class="absolute -left-12 -top-12 w-36 h-36 bg-bordeaux-700/15 rounded-full blur-3xl pointer-events-none"></div>
+        <div class="absolute -right-12 -bottom-12 w-36 h-36 bg-cyanGlow/10 rounded-full blur-3xl pointer-events-none"></div>
+
+        <div class="flex justify-between items-start">
+          <div>
+            <div class="flex items-center gap-1.5 text-xs text-metal-300 font-medium mb-1">
+              <i class="fa-solid fa-gauge-high text-cyanGlow text-[11px]"></i>
+              <span>צריכת דלק ממוצעת</span>
+            </div>
+            <div class="flex items-baseline gap-2">
+              <span id="heroAvgConsumption" class="text-3xl sm:text-4xl font-black text-white font-mono tracking-tight">14.24</span>
+              <span class="text-xs font-semibold text-metal-300">ק"מ / ליטר</span>
+            </div>
+          </div>
+
+          <!-- Trend Badge -->
+          <div class="flex items-center gap-1 px-2.5 py-1 rounded-xl bg-emerald-950/70 border border-emerald-700/50 text-emerald-400 text-xs font-bold shadow-sm">
+            <i class="fa-solid fa-arrow-trend-up text-[10px]"></i>
+            <span>4.1%+ יעיל</span>
+          </div>
+        </div>
+
+        <!-- Integrated Maintenance Alert Bar -->
+        <div class="mt-4 pt-3 border-t border-metal-700/40">
+          <div class="rounded-2xl p-2.5 bg-gradient-to-r from-metal-900/90 to-metal-850 border border-amber-600/30 flex items-center gap-3">
+            <div class="w-8 h-8 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center shrink-0 border border-amber-500/30">
+              <i class="fa-solid fa-wrench text-xs"></i>
+            </div>
+            <div class="flex-1 min-w-0 text-right">
+              <div class="flex items-center justify-between">
+                <span class="text-xs font-bold text-amber-300">טיפול 15,000 ק"מ מתקרב</span>
+                <span class="text-[10px] font-bold text-metal-300 bg-metal-800 px-1.5 py-0.5 rounded">ב-163,000</span>
+              </div>
+              <p class="text-[11px] text-metal-300 mt-0.5">נותרו עוד <strong id="heroRemainingKm" class="text-white font-mono font-bold">906 ק"מ</strong> עד לטיפול שמן ופילטרים</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Full Tank Range & Fuel Level Bar -->
+      <section class="metallic-card rounded-3xl p-4 text-right border border-metal-700/60">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-2.5">
+            <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-bordeaux-900 to-metal-850 border border-bordeaux-700/60 text-bordeaux-400 flex items-center justify-center text-sm shadow-sm">
+              <i class="fa-solid fa-gas-pump"></i>
+            </div>
+            <div>
+              <span class="text-xs font-bold text-white block">מד דלק וחיזוי צריכה</span>
+              <span id="tankStatusBadge" class="text-xs px-2.5 py-0.5 rounded-full bg-emerald-950 text-emerald-400 font-bold border border-emerald-800/60 inline-block mt-0.5">מיכל מלא 100%</span>
+            </div>
+          </div>
+          <div class="text-left">
+            <span class="text-[11px] text-metal-400 block font-medium">עלות לק"מ</span>
+            <span class="text-base font-black text-white font-mono"><span id="costPerKmDisplay">0.54</span> ₪</span>
+          </div>
+        </div>
+
+        <!-- 9 LED Bars Visual Simulator -->
+        <div class="my-3.5 p-3 rounded-2xl bg-metal-950 border border-metal-800/80">
+          <div class="flex items-center justify-between text-xs text-metal-400 mb-2">
+            <span>מצב 9 נורות לוח המחוונים:</span>
+            <span id="nineBarsText" class="font-mono text-sm tracking-widest text-emerald-400">🟩🟩🟩🟩🟩🟩🟩🟩🟩</span>
+          </div>
+          <div class="w-full bg-metal-900 h-3 rounded-full overflow-hidden p-0.5 border border-metal-800">
+            <div id="tankLevelBar" class="bg-gradient-to-r from-emerald-500 via-teal-400 to-cyan-500 h-full rounded-full transition-all duration-700 shadow-sm" style="width: 100%;"></div>
+          </div>
+        </div>
+
+        <!-- Quick Fuel Stats Grid -->
+        <div class="grid grid-cols-3 gap-2 text-center text-xs">
+          <div class="p-2.5 rounded-2xl bg-metal-900/90 border border-metal-800">
+            <span class="text-[10px] text-metal-400 block mb-0.5">ליטרים במיכל</span>
+            <strong id="tankLitersDisplay" class="text-sm font-black font-mono text-white">50.0L</strong>
+          </div>
+          <div class="p-2.5 rounded-2xl bg-metal-900/90 border border-metal-800">
+            <span class="text-[10px] text-metal-400 block mb-0.5">טווח משוער</span>
+            <strong id="tankFullRangeDisplay" class="text-sm font-black font-mono text-emerald-400">~712 ק"מ</strong>
+          </div>
+          <div class="p-2.5 rounded-2xl bg-metal-900/90 border border-metal-800">
+            <span class="text-[10px] text-metal-400 block mb-0.5">מד אוץ עדכני</span>
+            <strong id="currentOdometerDisplay" class="text-sm font-black font-mono text-cyanGlow">162,094</strong>
+          </div>
+        </div>
+      </section>
+
+      <!-- Monthly Fuel Expense Chart -->
+      <section class="metallic-card rounded-3xl p-4 text-right">
+        <div class="flex items-center justify-between mb-3">
+          <div class="flex items-center gap-2">
+            <i class="fa-solid fa-chart-line text-cyanGlow text-xs"></i>
+            <h2 class="text-xs font-bold text-white">הוצאות דלק חודשיות (2026)</h2>
+          </div>
+          <span id="monthlyTotalDisplay" class="text-xs font-mono font-bold text-white bg-metal-800 px-2 py-0.5 rounded-lg border border-metal-700">491.73 ₪</span>
+        </div>
+        <div class="h-44 w-full relative">
+          <canvas id="fuelChartCanvas"></canvas>
+        </div>
+      </section>
+
+      <!-- Recent Fuel Receipts Feed -->
+      <section class="space-y-2">
+        <div class="flex items-center justify-between px-1">
+          <h2 class="text-xs font-bold text-metal-200 flex items-center gap-1.5">
+            <i class="fa-solid fa-receipt text-bordeaux-400 text-[11px]"></i>
+            <span>תדלוקים אחרונים</span>
+          </h2>
+          <span id="refuelsCountBadge" class="text-[11px] text-metal-400">טוען...</span>
+        </div>
+        <div id="receiptsFeedList" class="space-y-2 text-xs">
+          <!-- Dynamically populated -->
+        </div>
+      </section>
+    </main>
+
+    <!-- ================= VIEW 2: MAINTENANCE & INSURANCE ================= -->
+    <main id="viewMaint" class="hidden flex-1 px-3.5 pt-3 space-y-3.5">
+
+      <!-- Insurance Privacy-First Manual Card -->
+      <section class="metallic-card rounded-3xl p-4 text-right border border-cyan-800/50 relative overflow-hidden">
+        <div class="flex items-center justify-between mb-2">
+          <div class="flex items-center gap-2.5">
+            <div class="w-9 h-9 rounded-xl bg-cyan-950 border border-cyan-700/60 text-cyanGlow flex items-center justify-center text-sm shadow-sm">
+              <i class="fa-solid fa-shield-halved"></i>
+            </div>
+            <div>
+              <span class="text-xs font-bold text-white block">ביטוח רכב (פרטיות מלאה)</span>
+              <span id="insuranceTypeDisplay" class="text-[11px] text-cyan-300 font-semibold">מקיף + חובה</span>
+            </div>
+          </div>
+          <button onclick="openInsuranceModal()" class="px-3 py-1 bg-cyan-950 hover:bg-cyan-900 border border-cyan-700/60 text-cyanGlow text-xs font-bold rounded-xl active:scale-95 transition">
+            <i class="fa-solid fa-pen-to-square ml-1 text-[10px]"></i>
+            <span>עדכן פוליסה</span>
+          </button>
+        </div>
+
+        <div class="grid grid-cols-3 gap-2 my-3 text-center">
+          <div class="p-2.5 rounded-2xl bg-metal-950/80 border border-metal-800">
+            <span class="text-[10px] text-metal-400 block mb-0.5">עלות שנתית</span>
+            <strong id="insuranceAnnualDisplay" class="text-sm font-black font-mono text-white">3,450 ₪</strong>
+          </div>
+          <div class="p-2.5 rounded-2xl bg-metal-950/80 border border-metal-800">
+            <span class="text-[10px] text-metal-400 block mb-0.5">מחיר לחודש</span>
+            <strong id="insuranceMonthlyDisplay" class="text-sm font-black font-mono text-cyanGlow">287.5 ₪</strong>
+          </div>
+          <div class="p-2.5 rounded-2xl bg-metal-950/80 border border-metal-800">
+            <span class="text-[10px] text-metal-400 block mb-0.5">חידוש ביטוח</span>
+            <strong id="insuranceDaysDisplay" class="text-sm font-black font-mono text-emerald-400">עוד 108 י'</strong>
+          </div>
+        </div>
+
+        <div class="pt-2 border-t border-metal-800/80 flex items-center justify-between text-[11px] text-metal-300">
+          <span>חברה: <strong id="insuranceCompanyDisplay" class="text-white">הפניקס</strong></span>
+          <span id="insuranceNotesDisplay" class="truncate max-w-[200px] text-metal-400">שירותי דרך, גרירה VIP ושמשות</span>
+        </div>
+      </section>
+
+      <!-- Vehicle Test & Registration -->
+      <section class="grid grid-cols-2 gap-2.5">
+        <div class="metallic-card rounded-2xl p-3 text-right border-r-4 border-r-emerald-500 flex flex-col justify-between">
+          <div>
+            <div class="flex items-center justify-between mb-1">
+              <span class="text-xs font-bold text-white flex items-center gap-1.5">
+                <i class="fa-solid fa-calendar-check text-emerald-400 text-[11px]"></i>
+                <span>טסט שנתי</span>
+              </span>
+              <span class="text-[9px] px-1.5 py-0.2 rounded bg-emerald-950 text-emerald-400 font-bold border border-emerald-800/40">בתוקף</span>
+            </div>
+            <div id="testExpiryDateDisplay" class="text-base font-black text-white font-mono mt-1">24/12/2026</div>
+            <div class="text-[11px] text-metal-300 mt-0.5">עוד <strong id="testDaysDisplay" class="text-emerald-400 font-mono">101 ימים</strong></div>
+          </div>
+          <div class="mt-2 pt-2 border-t border-metal-800 text-[10px] text-emerald-400">מאומת משרד התחבורה ✅</div>
+        </div>
+
+        <div class="metallic-card rounded-2xl p-3 text-right border-r-4 border-r-amber-500 flex flex-col justify-between">
+          <div>
+            <div class="flex items-center justify-between mb-1">
+              <span class="text-xs font-bold text-white flex items-center gap-1.5">
+                <i class="fa-solid fa-ring text-amberGlow text-[11px]"></i>
+                <span>צמיגים</span>
+              </span>
+              <span class="text-[9px] px-1.5 py-0.2 rounded bg-amber-950 text-amber-400 font-bold border border-amber-800/40">32 PSI</span>
+            </div>
+            <div id="tireSizeDisplay" class="text-base font-black text-white font-mono mt-1">195/65R15</div>
+            <div class="text-[11px] text-metal-300 mt-0.5">מצב תקין • בדיקה תקינה</div>
+          </div>
+          <div class="mt-2 pt-2 border-t border-metal-800 text-[10px] text-metal-400">4 צמיגים מורכבים</div>
+        </div>
+      </section>
+
+      <!-- Maintenance & Repairs Logger -->
+      <section class="metallic-card rounded-3xl p-4 text-right space-y-3">
+        <div class="flex items-center justify-between mb-1">
+          <div class="flex items-center gap-2">
+            <i class="fa-solid fa-wrench text-amberGlow text-xs"></i>
+            <h2 class="text-xs font-bold text-white">יומן טיפולים ותיקונים עצמאי</h2>
+          </div>
+          <button onclick="openMaintenanceModal()" class="px-3 py-1 bg-amber-950 hover:bg-amber-900 border border-amber-700/60 text-amber-300 text-xs font-bold rounded-xl active:scale-95 transition flex items-center gap-1">
+            <i class="fa-solid fa-plus text-[10px]"></i>
+            <span>תעד טיפול / קבלה</span>
+          </button>
+        </div>
+
+        <div id="maintenanceRecordsList" class="space-y-2.5 text-xs">
+          <!-- Dynamically populated -->
+        </div>
+      </section>
+    </main>
+
+    <!-- ================= VIEW 3: TOTAL COST OF OWNERSHIP (TCO) ================= -->
+    <main id="viewTco" class="hidden flex-1 px-3.5 pt-3 space-y-3.5">
+
+      <!-- TCO Summary Cards -->
+      <section class="metallic-card rounded-3xl p-4 text-right border border-metal-700/60">
+        <div class="flex items-center justify-between mb-2">
+          <div class="flex items-center gap-2">
+            <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-metal-800 to-metal-700 text-amberGlow flex items-center justify-center text-sm shadow-sm">
+              <i class="fa-solid fa-wallet"></i>
+            </div>
+            <div>
+              <span class="text-xs font-bold text-white block">מעטפת הוצאות שנתית כוללת</span>
+              <span class="text-[11px] text-metal-400">כלל עלויות הרכב: דלק, ביטוח, טיפולים וטסט</span>
+            </div>
+          </div>
+          <div class="text-left">
+            <span class="text-[10px] text-metal-400 block font-medium">עלות משוקללת לק"מ</span>
+            <span id="tcoCostPerKmDisplay" class="text-lg font-black text-emerald-400 font-mono">0.82 ₪</span>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-2.5 my-3">
+          <div class="p-3 rounded-2xl bg-metal-950/90 border border-metal-800">
+            <span class="text-[11px] text-metal-400 block">סה"כ דלק ששולם</span>
+            <div class="flex items-baseline gap-1 mt-1">
+              <strong id="tcoFuelTotalDisplay" class="text-xl font-black font-mono text-white">4,812</strong>
+              <span class="text-xs text-metal-300">₪</span>
+            </div>
+          </div>
+
+          <div class="p-3 rounded-2xl bg-metal-950/90 border border-metal-800">
+            <span class="text-[11px] text-metal-400 block">ביטוח שנתי</span>
+            <div class="flex items-baseline gap-1 mt-1">
+              <strong id="tcoInsuranceTotalDisplay" class="text-xl font-black font-mono text-cyanGlow">3,450</strong>
+              <span class="text-xs text-metal-300">₪</span>
+            </div>
+          </div>
+
+          <div class="p-3 rounded-2xl bg-metal-950/90 border border-metal-800">
+            <span class="text-[11px] text-metal-400 block">טיפולים ותיקונים</span>
+            <div class="flex items-baseline gap-1 mt-1">
+              <strong id="tcoMaintTotalDisplay" class="text-xl font-black font-mono text-amber-300">650</strong>
+              <span class="text-xs text-metal-300">₪</span>
+            </div>
+          </div>
+
+          <div class="p-3 rounded-2xl bg-metal-950/90 border border-metal-800">
+            <span class="text-[11px] text-metal-400 block">סה"כ הוצאות רכב</span>
+            <div class="flex items-baseline gap-1 mt-1">
+              <strong id="tcoOverallTotalDisplay" class="text-xl font-black font-mono text-white">8,912</strong>
+              <span class="text-xs text-metal-300">₪</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Monthly Running Cost Breakdown -->
+      <section class="metallic-card rounded-3xl p-4 text-right">
+        <h3 class="text-xs font-bold text-white mb-2 flex items-center gap-1.5">
+          <i class="fa-solid fa-chart-pie text-cyanGlow"></i>
+          <span>התפלגות עלות חודשית ממוצעת</span>
+        </h3>
+        <div class="space-y-2 text-xs">
+          <div class="flex items-center justify-between p-2 rounded-xl bg-metal-900 border border-metal-800">
+            <span class="text-metal-300">דלק ממוצע לחודש:</span>
+            <strong id="tcoMonthlyFuel" class="font-mono text-white font-bold">~530 ₪ / חודש</strong>
+          </div>
+          <div class="flex items-center justify-between p-2 rounded-xl bg-metal-900 border border-metal-800">
+            <span class="text-metal-300">ביטוח (מחולק חודשית):</span>
+            <strong id="tcoMonthlyIns" class="font-mono text-cyanGlow font-bold">287.50 ₪ / חודש</strong>
+          </div>
+          <div class="flex items-center justify-between p-2 rounded-xl bg-metal-900 border border-metal-800">
+            <span class="text-metal-300">קרן טיפולים שנתית מומלצת:</span>
+            <strong class="font-mono text-amber-300 font-bold">~120 ₪ / חודש</strong>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- Fixed Bottom Thumb-Zone Action Bar -->
+    <div class="fixed bottom-0 left-0 right-0 z-40 max-w-[480px] mx-auto p-3.5 bg-gradient-to-t from-metal-950 via-metal-950/95 to-transparent backdrop-blur-lg border-t border-metal-800/80">
+      <div class="flex items-center gap-2">
+        <button id="mainInputCtaBtn" onclick="openOdometerSheet(false)" class="flex-1 h-14 metallic-bordeaux rounded-2xl flex items-center justify-center gap-2.5 text-white font-bold text-base tracking-wide active:scale-[0.98] transition shadow-lg shadow-bordeaux-900/60">
+          <i class="fa-solid fa-bolt-lightning text-amber-400 text-sm"></i>
+          <span id="mainCtaLabel">הזן קילומטראז' נוכחי</span>
+        </button>
+
+        <button onclick="openSimulationSheet()" title="הדמיית קבלת SMS מתחנה" class="h-14 px-3.5 rounded-2xl bg-metal-850 hover:bg-metal-800 border border-metal-700/60 text-metal-200 active:scale-95 transition flex flex-col items-center justify-center gap-0.5">
+          <i class="fa-solid fa-flask text-cyanGlow text-xs"></i>
+          <span class="text-[10px] font-medium whitespace-nowrap">הדמיה</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Backdrop Overlay for Bottom Sheets -->
+    <div id="sheetBackdrop" onclick="closeAllSheets()" class="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm hidden opacity-0 transition-opacity duration-300"></div>
+
+    <!-- Odometer Bottom Sheet -->
+    <div id="odometerSheet" class="fixed bottom-0 left-0 right-0 z-50 max-w-[480px] mx-auto bg-metal-900 border-t border-bordeaux-700/70 rounded-t-3xl p-5 shadow-2xl transform translate-y-full sheet-transition text-right">
+      <div class="w-12 h-1 bg-metal-700 rounded-full mx-auto mb-4 cursor-pointer" onclick="closeAllSheets()"></div>
+      
+      <div class="flex items-center justify-between mb-3">
+        <div class="flex items-center gap-2">
+          <div class="w-8 h-8 rounded-xl bg-bordeaux-800/80 flex items-center justify-center text-white text-xs">
+            <i class="fa-solid fa-gauge"></i>
+          </div>
+          <div>
+            <h3 class="font-bold text-base text-white">עדכון קילומטראז' נוכחי</h3>
+            <p id="odometerSheetSubtitle" class="text-xs text-metal-300">כיול מד דלק ויומן נסועה</p>
+          </div>
+        </div>
+        <button onclick="closeAllSheets()" class="w-8 h-8 rounded-xl bg-metal-800 text-metal-400 hover:text-white flex items-center justify-center">
+          <i class="fa-solid fa-xmark text-sm"></i>
+        </button>
+      </div>
+
+      <div class="flex items-center gap-2 mb-3">
+        <span class="text-[11px] text-metal-400">הצעות:</span>
+        <button onclick="setOdometerInput(162094)" class="px-2.5 py-1 rounded-lg bg-metal-800 border border-metal-700 text-xs font-mono text-cyanGlow hover:bg-metal-700">162,094</button>
+        <button onclick="setOdometerInput(162120)" class="px-2.5 py-1 rounded-lg bg-metal-800 border border-metal-700 text-xs font-mono text-metal-300 hover:bg-metal-700">+26 ק"מ</button>
+        <button onclick="setOdometerInput(162150)" class="px-2.5 py-1 rounded-lg bg-metal-800 border border-metal-700 text-xs font-mono text-metal-300 hover:bg-metal-700">+56 ק"מ</button>
+      </div>
+
+      <div class="relative my-4">
+        <input type="number" id="odometerInput" oninput="previewOdometerImpact()" inputmode="numeric" placeholder="162094" class="w-full h-16 rounded-2xl bg-metal-950 border-2 border-metal-700 focus:border-bordeaux-500 text-center text-3xl font-black font-mono text-white tracking-widest outline-none transition shadow-inner">
+        <span class="absolute left-4 top-1/2 -translate-y-1/2 text-xs font-bold text-metal-400 font-sans">ק"מ</span>
+      </div>
+
+      <!-- Live Calculation Impact Preview -->
+      <div id="odometerCalcPreview" class="mb-3 p-3 rounded-xl bg-metal-950/80 border border-metal-800 text-xs hidden">
+        <div class="flex items-center justify-between text-metal-300">
+          <span>מד דלק לאחר עדכון:</span>
+          <span id="previewFuelBadge" class="font-bold text-cyanGlow font-mono">50.0L (100%)</span>
+        </div>
+        <div class="flex items-center justify-between text-metal-400 text-[11px] mt-1">
+          <span>טווח נסיעה משוער:</span>
+          <span id="previewRangeBadge" class="font-bold text-white font-mono">~712 ק"מ</span>
+        </div>
+      </div>
+
+      <!-- Is Full Tank Checkbox -->
+      <label class="flex items-center gap-2 mb-4 cursor-pointer select-none text-xs text-metal-200">
+        <input type="checkbox" id="isFullTankCheckbox" onchange="previewOdometerImpact()" class="w-4 h-4 rounded bg-metal-950 border-metal-700 text-bordeaux-600 focus:ring-0">
+        <span>מילאתי מיכל מלא עכשיו (מכייל את מד הדלק ל-100%)</span>
+      </label>
+
+      <button id="submitOdometerBtn" onclick="submitOdometer()" class="w-full h-14 metallic-bordeaux rounded-2xl flex items-center justify-center gap-2 text-white font-bold text-base active:scale-[0.98] transition shadow-lg shadow-bordeaux-900/60">
+        <i class="fa-solid fa-floppy-disk text-sm"></i>
+        <span id="submitOdometerBtnText">שמור ועדכן מד דלק</span>
+      </button>
+
+      <div id="odometerFeedbackMsg" class="mt-2 text-center text-xs font-semibold hidden"></div>
+    </div>
+
+    <!-- Insurance Policy Bottom Sheet (Manual Entry) -->
+    <div id="insuranceSheet" class="fixed bottom-0 left-0 right-0 z-50 max-w-[480px] mx-auto bg-metal-900 border-t-2 border-cyan-500/70 rounded-t-3xl p-5 shadow-2xl transform translate-y-full sheet-transition text-right">
+      <div class="w-12 h-1.5 bg-metal-700 rounded-full mx-auto mb-4 cursor-pointer" onclick="closeAllSheets()"></div>
+
+      <div class="flex items-center justify-between mb-3">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-2xl bg-cyan-950 border border-cyan-500/40 text-cyanGlow flex items-center justify-center text-base shadow-sm">
+            <i class="fa-solid fa-shield-halved"></i>
+          </div>
+          <div>
+            <h3 class="font-extrabold text-lg text-white">עדכון פוליסת ביטוח</h3>
+            <p class="text-xs text-metal-300">הזנה ידנית עצמאית לשמירה על פרטיותך</p>
+          </div>
+        </div>
+        <button onclick="closeAllSheets()" class="w-9 h-9 rounded-xl bg-metal-800 text-metal-400 hover:text-white flex items-center justify-center">
+          <i class="fa-solid fa-xmark text-base"></i>
+        </button>
+      </div>
+
+      <div class="space-y-3 my-3">
+        <div>
+          <label class="block text-xs font-bold text-metal-300 mb-1">סוג ביטוח:</label>
+          <select id="insTypeInput" class="w-full h-11 bg-metal-950 border border-metal-700 rounded-xl px-3 text-sm text-white outline-none focus:border-cyan-500">
+            <option value="מקיף + חובה">מקיף + חובה (מומלץ)</option>
+            <option value="חובה + צד ג'">חובה + צד ג'</option>
+            <option value="חובה בלבד">חובה בלבד</option>
+          </select>
+        </div>
+
+        <div class="grid grid-cols-2 gap-2.5">
+          <div>
+            <label class="block text-xs font-bold text-metal-300 mb-1">חברת ביטוח:</label>
+            <input type="text" id="insCompanyInput" placeholder="הפניקס / הראל / מנורה" class="w-full h-11 bg-metal-950 border border-metal-700 rounded-xl px-3 text-sm text-white outline-none focus:border-cyan-500">
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-metal-300 mb-1">מחיר שנתי כולל (₪):</label>
+            <input type="number" id="insAnnualCostInput" placeholder="3450" class="w-full h-11 bg-metal-950 border border-metal-700 rounded-xl px-3 text-sm font-mono text-white text-center outline-none focus:border-cyan-500">
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-2.5">
+          <div>
+            <label class="block text-xs font-bold text-metal-300 mb-1">תאריך תחילת ביטוח:</label>
+            <input type="date" id="insStartDateInput" value="2026-01-01" class="w-full h-11 bg-metal-950 border border-metal-700 rounded-xl px-3 text-xs font-mono text-white outline-none focus:border-cyan-500">
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-metal-300 mb-1">תאריך סיום ביטוח:</label>
+            <input type="date" id="insEndDateInput" value="2026-12-31" class="w-full h-11 bg-metal-950 border border-metal-700 rounded-xl px-3 text-xs font-mono text-white outline-none focus:border-cyan-500">
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-metal-300 mb-1">הערות / כיסויים נוספים (גרירה/שמשות):</label>
+          <input type="text" id="insNotesInput" placeholder="כולל שירותי דרך וגרירה VIP, שמשות ורכב חלופי" class="w-full h-11 bg-metal-950 border border-metal-700 rounded-xl px-3 text-xs text-white outline-none focus:border-cyan-500">
+        </div>
+      </div>
+
+      <button onclick="saveInsuranceDetails()" class="w-full h-13 py-3.5 bg-gradient-to-r from-cyan-600 to-teal-600 hover:from-cyan-500 hover:to-teal-500 text-white font-bold rounded-2xl flex items-center justify-center gap-2 active:scale-[0.98] transition shadow-lg shadow-cyan-950/60 mt-4">
+        <i class="fa-solid fa-check"></i>
+        <span>שמור פרטי ביטוח</span>
+      </button>
+
+      <div id="insFeedbackMsg" class="mt-2 text-center text-xs font-semibold hidden"></div>
+    </div>
+
+    <!-- Maintenance & Repair Bottom Sheet (Logger with Receipt) -->
+    <div id="maintenanceSheet" class="fixed bottom-0 left-0 right-0 z-50 max-w-[480px] mx-auto bg-metal-900 border-t-2 border-amber-500/70 rounded-t-3xl p-5 shadow-2xl transform translate-y-full sheet-transition text-right">
+      <div class="w-12 h-1.5 bg-metal-700 rounded-full mx-auto mb-4 cursor-pointer" onclick="closeAllSheets()"></div>
+
+      <div class="flex items-center justify-between mb-3">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-2xl bg-amber-500/20 border border-amber-500/40 text-amber-400 flex items-center justify-center text-base shadow-sm">
+            <i class="fa-solid fa-wrench"></i>
+          </div>
+          <div>
+            <h3 class="font-extrabold text-lg text-white">תיעוד טיפול או תיקון חדש</h3>
+            <p class="text-xs text-metal-300">מעקב חלפים, מוסך, מחיר וקבלה</p>
+          </div>
+        </div>
+        <button onclick="closeAllSheets()" class="w-9 h-9 rounded-xl bg-metal-800 text-metal-400 hover:text-white flex items-center justify-center">
+          <i class="fa-solid fa-xmark text-base"></i>
+        </button>
+      </div>
+
+      <div class="space-y-3 my-3">
+        <div class="grid grid-cols-2 gap-2.5">
+          <div>
+            <label class="block text-xs font-bold text-metal-300 mb-1">סוג הטיפול:</label>
+            <select id="maintTypeInput" class="w-full h-11 bg-metal-950 border border-metal-700 rounded-xl px-3 text-xs text-white outline-none focus:border-amber-400">
+              <option value="טיפול 15,000 ק&quot;מ">טיפול 15,000 ק"מ (שמנים ופילטרים)</option>
+              <option value="החלפת בלמים/רפידות">החלפת בלמים/רפידות</option>
+              <option value="החלפת 4 צמיגים">החלפת 4 צמיגים</option>
+              <option value="החלפת מצבר">החלפת מצבר</option>
+              <option value="טסט שנתי ואגרה">טסט שנתי ואגרה</option>
+              <option value="תיקון תקלה / מזגן">תיקון תקלה / מזגן</option>
+              <option value="אחר">אחר</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-metal-300 mb-1">קילומטראז' בטיפול:</label>
+            <input type="number" id="maintKmInput" placeholder="163000" class="w-full h-11 bg-metal-950 border border-metal-700 rounded-xl px-3 text-sm font-mono text-white text-center outline-none focus:border-amber-400">
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-2.5">
+          <div>
+            <label class="block text-xs font-bold text-metal-300 mb-1">שם המוסך / ספק:</label>
+            <input type="text" id="maintGarageInput" placeholder="מוסך טויוטה מורשה" class="w-full h-11 bg-metal-950 border border-metal-700 rounded-xl px-3 text-xs text-white outline-none focus:border-amber-400">
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-metal-300 mb-1">עלות סופית (₪):</label>
+            <input type="number" id="maintCostInput" placeholder="650" class="w-full h-11 bg-metal-950 border border-metal-700 rounded-xl px-3 text-sm font-mono text-white text-center outline-none focus:border-amber-400">
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-metal-300 mb-1">פירוט חלקים ועבודה:</label>
+          <input type="text" id="maintDescInput" placeholder="שמן 5W-30 סינטטי, פילטר שמן Denso, פילטר אוויר ומזגן" class="w-full h-11 bg-metal-950 border border-metal-700 rounded-xl px-3 text-xs text-white outline-none focus:border-amber-400">
+        </div>
+
+        <div class="grid grid-cols-2 gap-2.5">
+          <div>
+            <label class="block text-xs font-bold text-metal-300 mb-1">ק"מ לטיפול הבא:</label>
+            <input type="number" id="maintNextKmInput" placeholder="178000" class="w-full h-11 bg-metal-950 border border-metal-700 rounded-xl px-3 text-sm font-mono text-white text-center outline-none focus:border-amber-400">
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-metal-300 mb-1">קישור / קובץ קבלה:</label>
+            <input type="text" id="maintReceiptUrlInput" placeholder="https://... או שם קובץ" class="w-full h-11 bg-metal-950 border border-metal-700 rounded-xl px-3 text-xs font-mono text-white outline-none focus:border-amber-400">
+          </div>
+        </div>
+      </div>
+
+      <button onclick="saveMaintenanceRecord()" class="w-full h-13 py-3.5 bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-500 hover:to-amber-600 text-white font-bold rounded-2xl flex items-center justify-center gap-2 active:scale-[0.98] transition shadow-lg shadow-amber-950/60 mt-4">
+        <i class="fa-solid fa-floppy-disk"></i>
+        <span>שמור טיפול ביומן</span>
+      </button>
+
+      <div id="maintFeedbackMsg" class="mt-2 text-center text-xs font-semibold hidden"></div>
+    </div>
+
+    <!-- Multi-Car Settings & Plate Switcher Sheet -->
+    <div id="carSettingsSheet" class="fixed bottom-0 left-0 right-0 z-50 max-w-[480px] mx-auto bg-metal-900 border-t-2 border-amber-500/70 rounded-t-3xl p-5 shadow-2xl transform translate-y-full sheet-transition text-right">
+      <div class="w-12 h-1.5 bg-metal-700 rounded-full mx-auto mb-4 cursor-pointer" onclick="closeAllSheets()"></div>
+
+      <div class="flex items-center justify-between mb-3">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-2xl bg-amber-500/20 border border-amber-500/40 text-amber-400 flex items-center justify-center text-base shadow-sm">
+            <i class="fa-solid fa-car"></i>
+          </div>
+          <div>
+            <h3 class="font-extrabold text-lg text-white">החלפת רכב ומספר רישוי</h3>
+            <p class="text-xs text-metal-300">שליפת נתונים דינמית ממשרד התחבורה</p>
+          </div>
+        </div>
+        <button onclick="closeAllSheets()" class="w-9 h-9 rounded-xl bg-metal-800 text-metal-400 hover:text-white flex items-center justify-center">
+          <i class="fa-solid fa-xmark text-base"></i>
+        </button>
+      </div>
+
+      <!-- Israeli Yellow Plate Input Box -->
+      <div class="my-4">
+        <label class="block text-xs font-bold text-metal-200 mb-1.5 flex items-center justify-between">
+          <span>מספר לוחית רישוי:</span>
+          <span class="text-[11px] text-cyanGlow font-normal">שליפה אוטומטית מ-data.gov.il</span>
+        </label>
+        <div class="flex gap-2">
+          <div class="relative flex-1">
+            <div class="flex items-center bg-amber-400 rounded-2xl p-1 border-2 border-amber-500 shadow-inner">
+              <div class="bg-blue-700 text-white font-black text-[10px] px-2 py-2 rounded-xl flex flex-col items-center leading-tight shrink-0 mr-1">
+                <span>IL</span>
+                <span>ישראל</span>
+              </div>
+              <input type="text" id="carPlateInput" inputmode="numeric" placeholder="8636979" value="8636979" class="w-full bg-transparent text-black font-mono font-black text-2xl tracking-widest text-center outline-none">
+            </div>
+          </div>
+          <button id="lookupCarBtn" onclick="lookupPlateData()" class="px-4 bg-bordeaux-700 hover:bg-bordeaux-600 active:scale-95 text-white font-bold text-xs rounded-2xl flex flex-col items-center justify-center gap-1 shrink-0 border border-bordeaux-600/50 shadow-md">
+            <i class="fa-solid fa-magnifying-glass text-xs"></i>
+            <span id="lookupBtnText">אמת רכב</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Quick Switcher for Existing Vehicles -->
+      <div id="existingVehiclesContainer" class="mb-3 space-y-1.5">
+        <label class="block text-xs font-bold text-metal-400">רכבים שמורים בחשבון:</label>
+        <div id="existingVehiclesList" class="flex flex-wrap gap-2">
+          <!-- Populated dynamically -->
+        </div>
+      </div>
+
+      <!-- Tank Capacity & Odometer Inputs -->
+      <div class="grid grid-cols-2 gap-3 my-3">
+        <div class="bg-metal-950/80 p-3 rounded-2xl border border-metal-800">
+          <label class="block text-[11px] font-bold text-metal-300 mb-1">נפח מיכל דלק (ליטר):</label>
+          <div class="relative">
+            <input type="number" id="carTankInput" value="50" class="w-full h-11 bg-metal-900 border border-metal-700 rounded-xl px-3 text-base font-mono font-bold text-white text-center outline-none focus:border-amber-400">
+            <span class="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-metal-400 font-sans">ליטר</span>
+          </div>
+        </div>
+
+        <div class="bg-metal-950/80 p-3 rounded-2xl border border-metal-800">
+          <label class="block text-[11px] font-bold text-metal-300 mb-1">מד אוץ נוכחי (ק"מ):</label>
+          <div class="relative">
+            <input type="number" id="carCurrentKmInput" value="162094" class="w-full h-11 bg-metal-900 border border-metal-700 rounded-xl px-3 text-base font-mono font-bold text-white text-center outline-none focus:border-cyan-400">
+            <span class="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-metal-400 font-sans">ק"מ</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Car Details Preview Card (Gov Data Result) -->
+      <div id="carGovDetailsCard" class="my-3 p-3.5 rounded-2xl bg-metal-950/90 border border-metal-800 space-y-2 text-xs">
+        <div class="flex items-center justify-between pb-1.5 border-b border-metal-800">
+          <span class="text-metal-400">דגם ורמת גימור:</span>
+          <span id="govCarModelDisplay" class="font-bold text-white">טויוטה COROLLA GLI (2012)</span>
+        </div>
+        <div class="flex items-center justify-between pb-1.5 border-b border-metal-800">
+          <span class="text-metal-400">צבע וסוג דלק:</span>
+          <span id="govCarColorDisplay" class="font-medium text-metal-200">אפור כהה מטלי • בנזין</span>
+        </div>
+        <div class="flex items-center justify-between">
+          <span class="text-metal-400">תוקף טסט רישוי שנתי:</span>
+          <span id="govCarTestDisplay" class="font-mono font-bold text-emerald-400">24/12/2026 (עוד 101 ימים)</span>
+        </div>
+      </div>
+
+      <button onclick="saveCarSettings()" class="w-full h-13 py-3.5 metallic-bordeaux rounded-2xl flex items-center justify-center gap-2 text-white font-bold text-base active:scale-[0.98] transition shadow-lg shadow-bordeaux-950/70 mt-3">
+        <i class="fa-solid fa-check"></i>
+        <span>הפעל והגדר רכב זה</span>
+      </button>
+
+      <div id="carSettingsFeedbackMsg" class="mt-2 text-center text-xs font-semibold hidden"></div>
+    </div>
+
+    <!-- Simulation Bottom Sheet -->
+    <div id="simulationSheet" class="fixed bottom-0 left-0 right-0 z-50 max-w-[480px] mx-auto bg-metal-900 border-t border-cyan-700/70 rounded-t-3xl p-5 shadow-2xl transform translate-y-full sheet-transition text-right">
+      <div class="w-12 h-1 bg-metal-700 rounded-full mx-auto mb-4 cursor-pointer" onclick="closeAllSheets()"></div>
+
+      <div class="flex items-center justify-between mb-3">
+        <div class="flex items-center gap-2">
+          <div class="w-8 h-8 rounded-xl bg-cyan-950 border border-cyan-800 text-cyan-400 flex items-center justify-center text-xs">
+            <i class="fa-solid fa-flask"></i>
+          </div>
+          <div>
+            <h3 class="font-bold text-base text-white">סימולציית תדלוק (סונול/פז/אלון)</h3>
+            <p class="text-xs text-metal-300">בדיקת קליטת SMS/פוש וחילוץ נתונים</p>
+          </div>
+        </div>
+        <button onclick="closeAllSheets()" class="w-8 h-8 rounded-xl bg-metal-800 text-metal-400 hover:text-white flex items-center justify-center">
+          <i class="fa-solid fa-xmark text-sm"></i>
+        </button>
+      </div>
+
+      <div class="space-y-3 my-3">
+        <div>
+          <label class="block text-xs font-bold text-metal-300 mb-1">תוכן SMS לבדיקה:</label>
+          <textarea id="simSmsText" rows="3" class="w-full bg-metal-950 border border-metal-700 rounded-xl p-2.5 text-xs font-mono text-metal-200 outline-none focus:border-cyan-500">תודה שתדלקת בסונול! לחשבונית דיגיטלית: https://public.pairzon.com/1155/27JDZ4jzDgXnY8r1f9PhQG</textarea>
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-metal-300 mb-1">קילומטראז' (אופציונלי):</label>
+          <input type="number" id="simKmInput" placeholder="162094" class="w-full h-11 bg-metal-950 border border-metal-700 rounded-xl px-3 text-sm font-mono text-white text-center outline-none focus:border-cyan-500">
+        </div>
+      </div>
+
+      <button id="runSimBtn" onclick="runSimulation()" class="w-full h-13 py-3.5 bg-gradient-to-r from-cyan-600 to-teal-600 hover:from-cyan-500 hover:to-teal-500 text-white font-bold rounded-2xl flex items-center justify-center gap-2 active:scale-[0.98] transition shadow-lg shadow-cyan-950/60">
+        <i class="fa-solid fa-paper-plane text-xs"></i>
+        <span id="runSimBtnText">שגר הדמיית תדלוק</span>
+      </button>
+
+      <div id="simFeedbackMsg" class="mt-2 text-center text-xs font-semibold hidden"></div>
+    </div>
+
+  </div>
+
+  <script>
+    let currentStats = null;
+    let fuelChartInstance = null;
+
+    const urlParams = new URLSearchParams(window.location.search);
+    const AUTH_TOKEN = urlParams.get('token') || '';
+
+    function getApiUrl(path) {
+      if (!AUTH_TOKEN) return path;
+      const separator = path.includes('?') ? '&' : '?';
+      return `${path}${separator}token=${encodeURIComponent(AUTH_TOKEN)}`;
+    }
+
+    function openGoogleSheets() {
+      if (window.AndroidBridge && window.AndroidBridge.openSheets) {
+        window.AndroidBridge.openSheets();
+      } else if (currentStats && currentStats.spreadsheet_url) {
+        window.open(currentStats.spreadsheet_url, '_blank');
+      } else {
+        alert("נא להגדיר קישור ל-Google Sheets בהגדרות המערכת");
+      }
+    }
+
+    function switchNavTab(tab) {
+      if (window.AndroidBridge && window.AndroidBridge.vibrate) window.AndroidBridge.vibrate();
+
+      const tabs = ['fuel', 'maint', 'tco'];
+      tabs.forEach(t => {
+        const view = document.getElementById('view' + t.charAt(0).toUpperCase() + t.slice(1));
+        const btn = document.getElementById('navTab' + t.charAt(0).toUpperCase() + t.slice(1));
+        if (t === tab) {
+          view.classList.remove('hidden');
+          btn.className = 'py-2 px-1 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 bg-bordeaux-800 text-white shadow-sm shadow-bordeaux-950';
+        } else {
+          view.classList.add('hidden');
+          btn.className = 'py-2 px-1 rounded-xl text-xs font-medium text-metal-300 hover:text-white transition flex items-center justify-center gap-1.5';
+        }
+      });
+
+      const ctaLabel = document.getElementById('mainCtaLabel');
+      if (tab === 'fuel') {
+        ctaLabel.innerText = "הזן קילומטראז' נוכחי";
+      } else if (tab === 'maint') {
+        ctaLabel.innerText = "תעד טיפול / קבלה";
+      } else {
+        ctaLabel.innerText = "הזן קילומטראז' לחישוב עלות";
+      }
+    }
+
+    async function loadStats() {
+      try {
+        const res = await fetch(getApiUrl('/api/stats'));
+        const data = await res.json();
+        if (data && data.status === 'success') {
+          currentStats = data;
+          renderUI(data);
+        }
+      } catch (e) {
+        console.error("Failed to load stats:", e);
+      }
+    }
+
+    function renderUI(data) {
+      // 1. Header & Plate
+      const headerPlateBadge = document.getElementById('headerPlateBadge');
+      if (headerPlateBadge) headerPlateBadge.innerText = data.plate || '86-369-79';
+      
+      const headerCarName = document.getElementById('headerCarName');
+      if (headerCarName) {
+        headerCarName.innerText = `פוול טנק • ${data.car ? (data.car.includes('קורולה') ? 'קורולה' : data.car.substring(0, 16)) : 'רכב'}`;
+      }
+
+      // 2. Fuel View
+      document.getElementById('heroAvgConsumption').innerText = data.avg_km_per_liter || '14.24';
+      document.getElementById('heroRemainingKm').innerText = (data.service_remaining_km ? Number(data.service_remaining_km).toLocaleString() : '906') + ' ק"מ';
+      document.getElementById('costPerKmDisplay').innerText = data.avg_cost_per_km || '0.54';
+      document.getElementById('currentOdometerDisplay').innerText = Number(data.latest_km || 162094).toLocaleString();
+      document.getElementById('monthlyTotalDisplay').innerText = (data.monthly_spends && data.monthly_spends[8] ? Number(data.monthly_spends[8]).toFixed(2) : '491.73') + ' ₪';
+      document.getElementById('refuelsCountBadge').innerText = (data.refuel_count_2026 || 17) + ' רשומות ב-2026';
+
+      const fuelPct = data.fuel_percent !== undefined ? data.fuel_percent : 100;
+      const currentLiters = data.current_fuel_liters !== undefined ? data.current_fuel_liters : 50.0;
+      const estRange = data.estimated_remaining_range !== undefined ? data.estimated_remaining_range : 712;
+
+      document.getElementById('tankLitersDisplay').innerText = `${currentLiters}L`;
+      document.getElementById('tankFullRangeDisplay').innerText = `~${estRange} ק"מ`;
+
+      const tankLevelBar = document.getElementById('tankLevelBar');
+      if (tankLevelBar) {
+        tankLevelBar.style.width = `${Math.min(100, Math.max(4, fuelPct))}%`;
+      }
+
+      const nineBarsText = document.getElementById('nineBarsText');
+      if (nineBarsText) {
+        let filled = Math.round((fuelPct / 100.0) * 9.0);
+        filled = Math.max(0, Math.min(9, filled));
+        let bars = "";
+        for (let i = 0; i < filled; i++) bars += "🟩";
+        for (let i = filled; i < 9; i++) bars += "⬜";
+        nineBarsText.innerText = bars;
+      }
+
+      const tankStatusBadge = document.getElementById('tankStatusBadge');
+      if (tankStatusBadge) {
+        tankStatusBadge.innerText = fuelPct >= 99 ? 'מיכל מלא 100%' : `מיכל ${fuelPct}%`;
+      }
+
+      // 3. Receipts Feed
+      const feed = document.getElementById('receiptsFeedList');
+      feed.innerHTML = '';
+      if (data.recent_refuels && data.recent_refuels.length > 0) {
+        data.recent_refuels.forEach((r, idx) => {
+          const borderClass = idx === 0 ? 'border-r-4 border-r-bordeaux-600' : 'border-r-4 border-r-metal-700';
+          const item = document.createElement('div');
+          item.className = `metallic-card rounded-2xl p-3 flex items-center justify-between ${borderClass} transition hover:bg-metal-850/60`;
+          item.innerHTML = `
+            <div class="text-right">
+              <div class="flex items-center gap-2">
+                <span class="text-xs font-bold text-white">${r.station}</span>
+                <span class="text-[10px] px-1.5 py-0.2 rounded bg-metal-800 text-metal-300 font-mono">${r.date}</span>
+              </div>
+              <div class="flex items-center gap-2 mt-1 text-[11px] text-metal-300">
+                <span><strong class="text-white font-mono">${r.liters}</strong> ליטר</span>
+                <span class="text-metal-600">•</span>
+                <span>תעריף: <strong class="text-metal-200 font-mono">${r.rate}</strong> ₪/L</span>
+                <span class="text-metal-600">•</span>
+                <span>מד: <strong class="text-cyanGlow font-mono">${r.km ? Number(r.km).toLocaleString() : '---'}</strong></span>
+              </div>
+            </div>
+            <div class="text-left font-mono font-extrabold text-white text-sm shrink-0">
+              ${Number(r.total).toFixed(2)} ₪
+            </div>
+          `;
+          feed.appendChild(item);
+        });
+      }
+
+      // 4. Insurance & Maintenance
+      const ins = data.insurance || {};
+      document.getElementById('insuranceTypeDisplay').innerText = ins.insurance_type || 'מקיף + חובה';
+      document.getElementById('insuranceAnnualDisplay').innerText = Number(ins.annual_cost || 3450).toLocaleString() + ' ₪';
+      document.getElementById('insuranceMonthlyDisplay').innerText = Number(ins.monthly_cost || 287.5).toFixed(1) + ' ₪';
+      document.getElementById('insuranceCompanyDisplay').innerText = ins.company || 'הפניקס';
+      document.getElementById('insuranceDaysDisplay').innerText = `עוד ${data.insurance_days_remaining || 108} י'`;
+      document.getElementById('insuranceNotesDisplay').innerText = ins.notes || 'כולל שירותי דרך VIP';
+
+      document.getElementById('testExpiryDateDisplay').innerText = data.test_expiry_date || '24/12/2026';
+      document.getElementById('testDaysDisplay').innerText = `${data.test_days_remaining || 101} ימים`;
+      document.getElementById('tireSizeDisplay').innerText = data.tire_size || '195/65R15';
+
+      // 5. Maintenance Records List
+      const maintList = document.getElementById('maintenanceRecordsList');
+      maintList.innerHTML = '';
+      const maints = data.maintenance || [];
+      if (maints.length === 0) {
+        maintList.innerHTML = '<div class="text-center py-4 text-metal-400 text-xs">אין עדיין טיפולים רשומים עבור רכב זה.</div>';
+      } else {
+        maints.forEach(m => {
+          const item = document.createElement('div');
+          item.className = 'p-3 rounded-2xl bg-metal-900 border border-metal-800 flex items-center justify-between text-right';
+          item.innerHTML = `
+            <div class="flex-1 min-w-0">
+              <div class="flex items-center gap-2">
+                <span class="font-bold text-white text-xs">${m.service_type}</span>
+                <span class="text-[10px] font-mono text-metal-400">${m.date}</span>
+                ${m.receipt_url ? `<a href="${m.receipt_url}" target="_blank" class="text-[10px] text-cyanGlow hover:underline"><i class="fa-solid fa-paperclip"></i> קבלה</a>` : ''}
+              </div>
+              <p class="text-[11px] text-metal-300 mt-0.5 truncate">${m.description || m.parts_detail || m.garage}</p>
+              <div class="text-[10px] text-metal-400 mt-0.5 flex gap-2">
+                <span>מוסך: <strong>${m.garage || '---'}</strong></span>
+                <span>ב-<strong>${Number(m.km).toLocaleString()}</strong> ק"מ</span>
+              </div>
+            </div>
+            <div class="text-left font-mono font-bold text-amber-300 text-sm shrink-0 mr-2">
+              ${Number(m.cost).toLocaleString()} ₪
+            </div>
+          `;
+          maintList.appendChild(item);
+        });
+      }
+
+      // 6. TCO View
+      const tco = data.tco || {};
+      document.getElementById('tcoFuelTotalDisplay').innerText = Number(tco.total_fuel || data.total_spent_2026 || 4812).toLocaleString();
+      document.getElementById('tcoInsuranceTotalDisplay').innerText = Number(tco.annual_insurance || ins.annual_cost || 3450).toLocaleString();
+      document.getElementById('tcoMaintTotalDisplay').innerText = Number(tco.total_maintenance || 650).toLocaleString();
+      document.getElementById('tcoOverallTotalDisplay').innerText = Number(tco.total_annual_expenses || 8912).toLocaleString();
+      document.getElementById('tcoCostPerKmDisplay').innerText = (tco.total_cost_per_km || 0.82) + ' ₪';
+      document.getElementById('tcoMonthlyFuel').innerText = `~${Math.round((tco.total_fuel || 4812) / 9)} ₪ / חודש`;
+      document.getElementById('tcoMonthlyIns').innerText = `${Number(tco.monthly_insurance || 287.5).toFixed(1)} ₪ / חודש`;
+
+      // 7. Render Chart
+      renderChart(data.monthly_labels, data.monthly_spends);
+    }
+
+    function renderChart(labels, spends) {
+      const ctx = document.getElementById('fuelChartCanvas');
+      if (!ctx) return;
+      if (fuelChartInstance) fuelChartInstance.destroy();
+
+      fuelChartInstance = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: labels || ['ינואר', 'פברואר', 'מרץ', 'אפריל', 'מאי', 'יוני', 'יולי', 'אוגוסט', 'ספטמבר'],
+          datasets: [{
+            label: 'הוצאה חודשית (₪)',
+            data: spends || [450, 520, 610, 480, 530, 490, 510, 580, 491.73],
+            borderColor: '#ef4444',
+            backgroundColor: 'rgba(239, 68, 68, 0.15)',
+            borderWidth: 2.5,
+            fill: true,
+            tension: 0.35,
+            pointBackgroundColor: '#fff',
+            pointBorderColor: '#ef4444',
+            pointRadius: 3
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: {
+            x: { grid: { display: false }, ticks: { color: '#94a3b8', font: { size: 10 } } },
+            y: { grid: { color: 'rgba(255, 255, 255, 0.05)' }, ticks: { color: '#94a3b8', font: { size: 10 } } }
+          }
+        }
+      });
+    }
+
+    // Modal Sheet Helpers
+    function openOdometerSheet(isFromSms = false) {
+      closeAllSheets();
+      document.getElementById('sheetBackdrop').classList.remove('hidden');
+      setTimeout(() => document.getElementById('sheetBackdrop').classList.remove('opacity-0'), 10);
+      const sheet = document.getElementById('odometerSheet');
+      sheet.classList.remove('translate-y-full');
+      if (currentStats && currentStats.latest_km) {
+        document.getElementById('odometerInput').value = currentStats.latest_km;
+      }
+      previewOdometerImpact();
+    }
+
+    function openCarSettingsModal() {
+      closeAllSheets();
+      document.getElementById('sheetBackdrop').classList.remove('hidden');
+      setTimeout(() => document.getElementById('sheetBackdrop').classList.remove('opacity-0'), 10);
+      document.getElementById('carSettingsSheet').classList.remove('translate-y-full');
+      
+      // Populate existing vehicles badges
+      if (currentStats && currentStats.all_vehicles) {
+        const list = document.getElementById('existingVehiclesList');
+        list.innerHTML = '';
+        currentStats.all_vehicles.forEach(v => {
+          const isActive = v.plate === currentStats.plate;
+          const btn = document.createElement('button');
+          btn.className = `px-3 py-1 rounded-xl text-xs font-mono font-bold transition flex items-center gap-1.5 ${isActive ? 'bg-amber-400 text-black border border-amber-500' : 'bg-metal-800 text-white border border-metal-700 hover:bg-metal-700'}`;
+          btn.innerHTML = `<span>${v.plate}</span>${isActive ? '<i class="fa-solid fa-check text-[10px]"></i>' : ''}`;
+          btn.onclick = () => switchVehicle(v.plate);
+          list.appendChild(btn);
+        });
+      }
+    }
+
+    function openInsuranceModal() {
+      closeAllSheets();
+      document.getElementById('sheetBackdrop').classList.remove('hidden');
+      setTimeout(() => document.getElementById('sheetBackdrop').classList.remove('opacity-0'), 10);
+      document.getElementById('insuranceSheet').classList.remove('translate-y-full');
+      if (currentStats && currentStats.insurance) {
+        const ins = currentStats.insurance;
+        if (ins.insurance_type) document.getElementById('insTypeInput').value = ins.insurance_type;
+        if (ins.company) document.getElementById('insCompanyInput').value = ins.company;
+        if (ins.annual_cost) document.getElementById('insAnnualCostInput').value = ins.annual_cost;
+        if (ins.start_date) document.getElementById('insStartDateInput').value = ins.start_date;
+        if (ins.end_date) document.getElementById('insEndDateInput').value = ins.end_date;
+        if (ins.notes) document.getElementById('insNotesInput').value = ins.notes;
+      }
+    }
+
+    function openMaintenanceModal() {
+      closeAllSheets();
+      document.getElementById('sheetBackdrop').classList.remove('hidden');
+      setTimeout(() => document.getElementById('sheetBackdrop').classList.remove('opacity-0'), 10);
+      document.getElementById('maintenanceSheet').classList.remove('translate-y-full');
+      if (currentStats && currentStats.latest_km) {
+        document.getElementById('maintKmInput').value = currentStats.latest_km;
+        document.getElementById('maintNextKmInput').value = currentStats.latest_km + 15000;
+      }
+    }
+
+    function openSimulationSheet() {
+      closeAllSheets();
+      document.getElementById('sheetBackdrop').classList.remove('hidden');
+      setTimeout(() => document.getElementById('sheetBackdrop').classList.remove('opacity-0'), 10);
+      document.getElementById('simulationSheet').classList.remove('translate-y-full');
+    }
+
+    function closeAllSheets() {
+      const sheets = ['odometerSheet', 'carSettingsSheet', 'insuranceSheet', 'maintenanceSheet', 'simulationSheet'];
+      sheets.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.classList.add('translate-y-full');
+      });
+      const bd = document.getElementById('sheetBackdrop');
+      if (bd) {
+        bd.classList.add('opacity-0');
+        setTimeout(() => bd.classList.add('hidden'), 300);
+      }
+    }
+
+    async function switchVehicle(plate) {
+      if (window.AndroidBridge && window.AndroidBridge.setActiveVehiclePlate) {
+        window.AndroidBridge.setActiveVehiclePlate(plate);
+      }
+      try {
+        await fetch(getApiUrl('/api/vehicles'), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'switch', plate: plate })
+        });
+      } catch (ignored) {}
+      closeAllSheets();
+      loadStats();
+    }
+
+    async function lookupPlateData() {
+      const rawPlate = document.getElementById('carPlateInput').value.trim();
+      const btnText = document.getElementById('lookupBtnText');
+      if (!rawPlate) return;
+      btnText.innerText = 'שולף...';
+      try {
+        const res = await fetch(`/api/car-lookup?plate=${rawPlate}`);
+        const data = await res.json();
+        if (data && data.status === 'success') {
+          document.getElementById('govCarModelDisplay').innerText = `${data.manufacturer} ${data.model} (${data.year})`;
+          document.getElementById('govCarColorDisplay').innerText = `${data.color || 'צבע מקורי'} • ${data.fuel_type || 'בנזין'}`;
+          document.getElementById('govCarTestDisplay').innerText = `${data.test_date || 'בתוקף'} • צמיגים: ${data.tires || '195/65R15'}`;
+          btnText.innerText = 'אומת ✅';
+        } else {
+          btnText.innerText = 'לא נמצא';
+        }
+      } catch (e) {
+        btnText.innerText = 'שגיאה';
+      }
+    }
+
+    async function saveCarSettings() {
+      const plate = document.getElementById('carPlateInput').value.trim();
+      const tank = document.getElementById('carTankInput').value.trim();
+      const km = document.getElementById('carCurrentKmInput').value.trim();
+      const modelText = document.getElementById('govCarModelDisplay').innerText;
+      const feedback = document.getElementById('carSettingsFeedbackMsg');
+
+      feedback.className = 'mt-2 text-center text-xs font-semibold text-metal-300';
+      feedback.innerText = 'שומר הגדרות רכב...';
+      feedback.classList.remove('hidden');
+
+      try {
+        const payload = {
+          plate: plate,
+          tank_capacity: parseFloat(tank) || 50.0,
+          car_model: modelText || 'רכב ' + plate,
+          current_odometer: parseInt(km) || 0,
+          is_active: true
+        };
+
+        if (window.AndroidBridge && window.AndroidBridge.saveVehicle) {
+          window.AndroidBridge.saveVehicle(plate, modelText, payload.tank_capacity, 14.24, 7.9, "2026-12-24", "195/65R15", true);
+        }
+
+        await fetch(getApiUrl('/api/vehicles'), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+
+        feedback.className = 'mt-2 text-center text-xs font-semibold text-emerald-400';
+        feedback.innerText = '🎉 רכב הוגדר ונשמר בהצלחה!';
+        setTimeout(() => {
+          closeAllSheets();
+          feedback.classList.add('hidden');
+          loadStats();
+        }, 1000);
+      } catch (e) {
+        feedback.className = 'mt-2 text-center text-xs font-semibold text-rose-400';
+        feedback.innerText = 'שגיאה בשמירה: ' + e.message;
+      }
+    }
+
+    async function saveInsuranceDetails() {
+      const type = document.getElementById('insTypeInput').value;
+      const company = document.getElementById('insCompanyInput').value.trim();
+      const cost = parseFloat(document.getElementById('insAnnualCostInput').value) || 0;
+      const start = document.getElementById('insStartDateInput').value;
+      const end = document.getElementById('insEndDateInput').value;
+      const notes = document.getElementById('insNotesInput').value.trim();
+      const feedback = document.getElementById('insFeedbackMsg');
+
+      feedback.className = 'mt-2 text-center text-xs font-semibold text-metal-300';
+      feedback.innerText = 'שומר ביטוח...';
+      feedback.classList.remove('hidden');
+
+      try {
+        const payload = {
+          plate: currentStats ? currentStats.plate : '12-345-67',
+          insurance_type: type,
+          company: company,
+          annual_cost: cost,
+          start_date: start,
+          end_date: end,
+          notes: notes
+        };
+
+        if (window.AndroidBridge && window.AndroidBridge.saveInsurance) {
+          window.AndroidBridge.saveInsurance(payload.plate, type, company, start, end, cost, "", notes);
+        }
+
+        await fetch(getApiUrl('/api/insurance'), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+
+        feedback.className = 'mt-2 text-center text-xs font-semibold text-emerald-400';
+        feedback.innerText = '🎉 פוליסת ביטוח עודכנה בהצלחה!';
+        setTimeout(() => {
+          closeAllSheets();
+          feedback.classList.add('hidden');
+          loadStats();
+        }, 1000);
+      } catch (e) {
+        feedback.className = 'mt-2 text-center text-xs font-semibold text-rose-400';
+        feedback.innerText = 'שגיאה בשמירה: ' + e.message;
+      }
+    }
+
+    async function saveMaintenanceRecord() {
+      const type = document.getElementById('maintTypeInput').value;
+      const km = parseInt(document.getElementById('maintKmInput').value) || 0;
+      const garage = document.getElementById('maintGarageInput').value.trim();
+      const cost = parseFloat(document.getElementById('maintCostInput').value) || 0;
+      const desc = document.getElementById('maintDescInput').value.trim();
+      const nextKm = parseInt(document.getElementById('maintNextKmInput').value) || (km + 15000);
+      const url = document.getElementById('maintReceiptUrlInput').value.trim();
+      const feedback = document.getElementById('maintFeedbackMsg');
+
+      feedback.className = 'mt-2 text-center text-xs font-semibold text-metal-300';
+      feedback.innerText = 'שומר טיפול ביומן...';
+      feedback.classList.remove('hidden');
+
+      try {
+        const payload = {
+          plate: currentStats ? currentStats.plate : '12-345-67',
+          service_type: type,
+          km: km,
+          garage: garage,
+          cost: cost,
+          description: desc,
+          next_service_km: nextKm,
+          receipt_url: url,
+          category: 'תחזוקה'
+        };
+
+        if (window.AndroidBridge && window.AndroidBridge.saveMaintenance) {
+          window.AndroidBridge.saveMaintenance(new Date().toISOString().split('T')[0], km, type, desc, cost, garage, nextKm, url, desc, 'תחזוקה', payload.plate);
+        }
+
+        await fetch(getApiUrl('/api/maintenance'), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+
+        feedback.className = 'mt-2 text-center text-xs font-semibold text-emerald-400';
+        feedback.innerText = '🎉 טיפול נרשם בהצלחה ביומן!';
+        setTimeout(() => {
+          closeAllSheets();
+          feedback.classList.add('hidden');
+          loadStats();
+        }, 1000);
+      } catch (e) {
+        feedback.className = 'mt-2 text-center text-xs font-semibold text-rose-400';
+        feedback.innerText = 'שגיאה בשמירה: ' + e.message;
+      }
+    }
+
+    function setOdometerInput(val) {
+      document.getElementById('odometerInput').value = val;
+      previewOdometerImpact();
+    }
+
+    function previewOdometerImpact() {
+      const inputVal = document.getElementById('odometerInput').value.trim();
+      const previewBox = document.getElementById('odometerCalcPreview');
+      const isFull = document.getElementById('isFullTankCheckbox')?.checked;
+      if (!inputVal || !currentStats) {
+        if (previewBox) previewBox.classList.add('hidden');
+        return;
+      }
+
+      const km = parseInt(inputVal);
+      if (isNaN(km) || km < 100000) {
+        if (previewBox) previewBox.classList.add('hidden');
+        return;
+      }
+
+      const tankCapacity = currentStats.tank_capacity || 50.0;
+      const avgKmPerL = currentStats.avg_km_per_liter || 14.24;
+      const fullRefuelKm = isFull ? km : (currentStats.full_tank_refuel_km || 162024);
+      
+      const drivenSinceFull = isFull ? 0 : Math.max(0, km - fullRefuelKm);
+      const consumedLiters = drivenSinceFull / avgKmPerL;
+      const remainingLiters = isFull ? tankCapacity : Math.max(0, Math.min(tankCapacity, tankCapacity - consumedLiters));
+      const fuelPct = Math.round((remainingLiters / tankCapacity) * 100);
+      const estRange = Math.round(remainingLiters * avgKmPerL);
+
+      previewBox.classList.remove('hidden');
+      document.getElementById('previewFuelBadge').innerText = `${remainingLiters.toFixed(1)}L (${fuelPct}%)`;
+      document.getElementById('previewRangeBadge').innerText = `~${estRange} ק"מ`;
+    }
+
+    async function submitOdometer() {
+      if (window.AndroidBridge && window.AndroidBridge.vibrate) window.AndroidBridge.vibrate();
+      const km = document.getElementById('odometerInput').value.trim();
+      const isFull = document.getElementById('isFullTankCheckbox')?.checked || false;
+      const msg = document.getElementById('odometerFeedbackMsg');
+      const btnText = document.getElementById('submitOdometerBtnText');
+      const btn = document.getElementById('submitOdometerBtn');
+      if (!km) return;
+
+      btn.disabled = true;
+      btnText.innerText = 'מעדכן מד דלק ומערכת...';
+      msg.className = 'mt-2 text-center text-xs font-semibold text-metal-300';
+      msg.innerText = 'שולח נתון לשרת...';
+      msg.classList.remove('hidden');
+
+      try {
+        const res = await fetch(getApiUrl('/api/update-km'), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ km: km, is_full_tank: isFull })
+        });
+        const resp = await res.json();
+        if (res.ok && resp.status === 'success') {
+          msg.className = 'mt-2 text-center text-xs font-semibold text-emerald-400';
+          msg.innerText = isFull 
+            ? `✅ מיכל אופס לפול (100%) בק"מ ${km}!`
+            : `✅ קילומטראז' ${km} עודכן ומד הדלק כויל בהצלחה!`;
+          btnText.innerText = 'נשמר בהצלחה!';
+          setTimeout(() => {
+            closeAllSheets();
+            btn.disabled = false;
+            btnText.innerText = 'שמור ועדכן מד דלק';
+            msg.classList.add('hidden');
+            loadStats();
+          }, 1200);
+        } else {
+          msg.className = 'mt-2 text-center text-xs font-semibold text-rose-400';
+          msg.innerText = 'שגיאה: ' + (resp.message || 'לא הצלחנו לעדכן');
+          btn.disabled = false;
+          btnText.innerText = 'שמור ועדכן מד דלק';
+        }
+      } catch (e) {
+        msg.className = 'mt-2 text-center text-xs font-semibold text-rose-400';
+        msg.innerText = 'שגיאת תקשורת: ' + e.message;
+        btn.disabled = false;
+        btnText.innerText = 'שמור ועדכן מד דלק';
+      }
+    }
+
+    async function runSimulation() {
+      const text = document.getElementById('simSmsText').value.trim();
+      const km = document.getElementById('simKmInput').value.trim();
+      const msg = document.getElementById('simFeedbackMsg');
+      const btnText = document.getElementById('runSimBtnText');
+      const btn = document.getElementById('runSimBtn');
+
+      btn.disabled = true;
+      btnText.innerText = 'מפענח חשבונית...';
+      msg.className = 'mt-2 text-center text-xs font-semibold text-metal-300';
+      msg.innerText = 'שולף פרטים ומעדכן...';
+      msg.classList.remove('hidden');
+
+      try {
+        const res = await fetch(getApiUrl('/'), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text: text, km: km })
+        });
+        const resp = await res.json();
+        if (res.ok && resp.status === 'success') {
+          msg.className = 'mt-2 text-center text-xs font-semibold text-emerald-400';
+          msg.innerText = `🎉 סימולציה הצליחה! ${resp.receipt?.station || 'תחנת דלק'} (${resp.receipt?.total || ''} ₪) נקלט!`;
+          btnText.innerText = 'הדמיה הושלמה!';
+          setTimeout(() => {
+            closeAllSheets();
+            btn.disabled = false;
+            btnText.innerText = 'שגר הדמיית תדלוק';
+            msg.classList.add('hidden');
+            loadStats();
+          }, 1500);
+        } else {
+          msg.className = 'mt-2 text-center text-xs font-semibold text-rose-400';
+          msg.innerText = 'שגיאה: ' + (resp.message || 'סימולציה נכשלה');
+          btn.disabled = false;
+          btnText.innerText = 'שגר הדמיית תדלוק';
+        }
+      } catch (e) {
+        msg.className = 'mt-2 text-center text-xs font-semibold text-rose-400';
+        msg.innerText = 'שגיאת תקשורת: ' + e.message;
+        btn.disabled = false;
+        btnText.innerText = 'שגר הדמיית תדלוק';
+      }
+    }
+
+    async function triggerManualSync() {
+      const icon = document.getElementById('syncIcon');
+      icon.classList.add('fa-spin');
+      await loadStats();
+      setTimeout(() => icon.classList.remove('fa-spin'), 700);
+    }
+
+    // Initial Load
+    loadStats();
+
+    // Check if triggered from Fuel SMS Notification
+    window.addEventListener('DOMContentLoaded', () => {
+      const urlParams = new URLSearchParams(window.location.search);
+      if (urlParams.get('triggerKm') === 'true') {
+        switchNavTab('fuel');
+        setTimeout(() => {
+          openOdometerSheet(true);
+        }, 450);
+      }
+    });
+  </script>
+</body>
+</html>

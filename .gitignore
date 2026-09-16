@@ -1,0 +1,30 @@
+# Build & IDE files
+*.class
+*.dex
+*.apk
+*.ap_
+bin/
+build/
+.gradle/
+local.properties
+.idea/
+*.iml
+.DS_Store
+
+# Logs & Environment
+*.log
+.env
+.env.local
+
+# Secrets, Tokens & Private Credentials
+token.json
+credentials.json
+google_auth_oauthlib/
+saved_flow.pickle
+*.jks
+*.keystore
+
+# Private car data
+car_state.json
+!car_state.example.json
+!.env.example

@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="bg_dark">#07090E</color>
+    <color name="bg_card">#0D1117</color>
+    <color name="bordeaux_primary">#720D18</color>
+    <color name="bordeaux_accent">#B91C1C</color>
+    <color name="cyan_accent">#06B6D4</color>
+</resources>

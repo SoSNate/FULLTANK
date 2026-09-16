@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.swiperefreshlayout.widget.SwipeRefreshLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/swipeRefresh"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#07090E">
+
+    <WebView
+        android:id="@+id/webViewDashboard"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="#07090E" />
+
+</androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
