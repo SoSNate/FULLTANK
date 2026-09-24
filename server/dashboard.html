@@ -1048,11 +1048,16 @@
 
     // Modal Sheet Helpers
     function openOdometerSheet(isFromSms = false) {
+      window._isFromSms = isFromSms;
       closeAllSheets();
       document.getElementById('sheetBackdrop').classList.remove('hidden');
       setTimeout(() => document.getElementById('sheetBackdrop').classList.remove('opacity-0'), 10);
       const sheet = document.getElementById('odometerSheet');
       sheet.classList.remove('translate-y-full');
+      if (isFromSms) {
+        const fullCheck = document.getElementById('isFullTankCheckbox');
+        if (fullCheck) fullCheck.checked = true;
+      }
       if (currentStats && currentStats.latest_km) {
         document.getElementById('odometerInput').value = currentStats.latest_km;
       }
@@ -1354,11 +1359,13 @@
       msg.classList.remove('hidden');
 
       try {
+        const isRefuel = window._isFromSms || isFull;
         const res = await fetch(getApiUrl('/api/update-km'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ km: km, is_full_tank: isFull })
+          body: JSON.stringify({ km: km, is_full_tank: isFull, is_refuel_event: isRefuel })
         });
+        window._isFromSms = false;
         const resp = await res.json();
         if (res.ok && resp.status === 'success') {
           msg.className = 'mt-2 text-center text-xs font-semibold text-emerald-400';

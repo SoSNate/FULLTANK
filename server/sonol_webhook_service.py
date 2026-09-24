@@ -82,7 +82,7 @@ def append_receipt_to_sheets(receipt):
     print(f"Appended receipt {receipt['doc_id']} to {tab_name} at {updated_range}")
     return updated_range
 
-def update_last_km_in_sheets(km_value, tab_name='תדלוקים 2026'):
+def update_last_km_in_sheets(km_value, tab_name='תדלוקים 2026', only_if_empty=False):
     creds = google_tools.get_credentials()
     service = build('sheets', 'v4', credentials=creds)
     
@@ -95,6 +95,12 @@ def update_last_km_in_sheets(km_value, tab_name='תדלוקים 2026'):
         return False, "Tab is empty"
     
     last_row_index = len(rows)
+    last_row = rows[-1]
+    is_empty = len(last_row) < 2 or not str(last_row[1]).strip()
+    
+    if only_if_empty and not is_empty:
+        return False, "Last row already has KM"
+    
     cell = f"'{tab_name}'!B{last_row_index}"
     
     service.spreadsheets().values().update(
@@ -392,16 +398,17 @@ class FuelWebhookHandler(BaseHTTPRequestHandler):
                 notes = data.get('notes', '')
                 append_odometer_log(km_int, source=source, is_full_tank=is_full, notes=notes)
                 
-                # 2. ONLY update the refuel table 'תדלוקים 2026' if explicitly a refuel event
-                is_refuel_event = data.get('is_refuel_event', False) or data.get('is_refuel', False)
+                # 2. Update refuel table 'תדלוקים 2026':
+                # - If explicit refuel event or full tank: force update last row
+                # - Otherwise: check if last refuel row is missing KM (empty), and if so, fill it!
+                is_refuel_event = data.get('is_refuel_event', False) or data.get('is_refuel', False) or is_full
                 updated_cell = 'יומן נסועה וכיול'
-                if is_refuel_event:
-                    try:
-                        success, cell = update_last_km_in_sheets(km)
-                        if success:
-                            updated_cell = f"תדלוקים 2026 ({cell})"
-                    except Exception as e:
-                        print(f"Sheet refuel update error: {e}")
+                try:
+                    success, cell = update_last_km_in_sheets(km, only_if_empty=not is_refuel_event)
+                    if success:
+                        updated_cell = f"תדלוקים 2026 ({cell})"
+                except Exception as e:
+                    print(f"Sheet refuel update error: {e}")
                         
                 self.send_response(200)
                 self.send_header('Content-Type', 'application/json')
