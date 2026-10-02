@@ -511,6 +511,36 @@ class FuelWebhookHandler(BaseHTTPRequestHandler):
                 self.wfile.write(json.dumps({'status': 'error', 'message': str(e)}).encode('utf-8'))
                 return
 
+        # 1.9 Send Receipt to Morning (Expenses): /api/send-to-morning
+        if parsed.path == '/api/send-to-morning':
+            try:
+                data = json.loads(body)
+                receipt_url = data.get('url', '')
+                pdf_url = data.get('pdf', '')
+                total = data.get('total')
+                date_val = data.get('date')
+                station = data.get('station')
+
+                res = fuel_dashboard.send_receipt_to_morning(
+                    receipt_url=receipt_url,
+                    pdf_url=pdf_url,
+                    total=total,
+                    date=date_val,
+                    station=station
+                )
+                self.send_response(200 if res.get('success') else 400)
+                self.send_header('Content-Type', 'application/json; charset=utf-8')
+                self.send_cors_headers()
+                self.end_headers()
+                self.wfile.write(json.dumps(res, ensure_ascii=False).encode('utf-8'))
+                return
+            except Exception as e:
+                self.send_response(500)
+                self.send_cors_headers()
+                self.end_headers()
+                self.wfile.write(json.dumps({'status': 'error', 'message': str(e)}).encode('utf-8'))
+                return
+
         # 2. Main SMS parsing endpoint
         text_to_parse = body
         km_from_payload = ''

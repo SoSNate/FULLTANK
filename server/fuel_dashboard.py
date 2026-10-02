@@ -195,6 +195,9 @@ def save_maintenance_record(maint_data):
     save_car_state(state)
     return True, record
 
+MORNING_EXPENSE_EMAIL = os.environ.get('MORNING_EXPENSE_EMAIL', 'expenses@example.com')
+GMAIL_SENDER_EMAIL = os.environ.get('GMAIL_SENDER_EMAIL', 'user@example.com')
+
 def get_fuel_data():
     try:
         state = load_car_state()
@@ -204,10 +207,10 @@ def get_fuel_data():
         creds = google_tools.get_credentials()
         service = build('sheets', 'v4', credentials=creds)
         
-        # Get 2026 rows
+        # Get 2026 rows including Column I (Morning status)
         res_2026 = service.spreadsheets().values().get(
             spreadsheetId=SPREADSHEET_ID,
-            range='תדלוקים 2026!A2:H60'
+            range='תדלוקים 2026!A2:I60'
         ).execute()
         rows_2026 = res_2026.get('values', [])
         
@@ -218,6 +221,7 @@ def get_fuel_data():
         
         monthly_spend = {m: 0.0 for m in range(1, 13)}
         monthly_liters = {m: 0.0 for m in range(1, 13)}
+        morning_sent_dict = state.get('morning_expenses', {})
         
         for r in rows_2026:
             if not r or not r[0]:
@@ -230,6 +234,10 @@ def get_fuel_data():
             station_val = r[5] if len(r) > 5 else 'סונול'
             receipt_url = r[6] if len(r) > 6 else ''
             pdf_url = r[7] if len(r) > 7 else ''
+            morning_raw = r[8] if len(r) > 8 else ''
+            
+            is_morning = bool(morning_raw and 'נשלח' in morning_raw) or (receipt_url in morning_sent_dict) or (pdf_url in morning_sent_dict)
+            morning_status_text = morning_raw if morning_raw else (morning_sent_dict.get(receipt_url, {}).get('sent_at', '') if receipt_url in morning_sent_dict else ('נשלח' if is_morning else ''))
             
             km_val = int(km_raw) if km_raw.isdigit() else None
             if km_val and km_val > latest_km:
@@ -253,7 +261,9 @@ def get_fuel_data():
                 'rate': rate_val,
                 'station': station_val,
                 'url': receipt_url,
-                'pdf': pdf_url
+                'pdf': pdf_url,
+                'morning_sent': is_morning,
+                'morning_status': morning_status_text
             })
             
         if latest_km > int(active_veh.get('current_odometer', 162024)):
@@ -349,6 +359,12 @@ def get_fuel_data():
             'test_expiry_date': active_veh.get('test_expiry_date', '2026-12-24'),
             'test_days_remaining': test_days_remaining,
             'tire_size': active_veh.get('tire_size', '195/65R15'),
+            'morning_info': {
+                'email': MORNING_EXPENSE_EMAIL,
+                'sent_count': sum(1 for e in entries_2026 if e.get('morning_sent')),
+                'sent_amount': round(sum(e['total'] for e in entries_2026 if e.get('morning_sent')), 2),
+                'total_receipts': len(entries_2026)
+            },
             'tco': {
                 'total_fuel': round(total_spent_2026, 2),
                 'total_maintenance': round(total_maint_cost, 2),
@@ -360,3 +376,123 @@ def get_fuel_data():
         }
     except Exception as e:
         return {'status': 'error', 'message': str(e)}
+
+def send_receipt_to_morning(receipt_url, pdf_url=None, total=None, date=None, station=None):
+    """
+    Downloads receipt PDF from Pairzon and sends it via Gmail API to Morning expense inbox.
+    Updates Google Sheet 'תדלוקים 2026' column I and car_state.json with timestamp and status.
+    """
+    import urllib.request
+    import base64
+    from email.mime.multipart import MIMEMultipart
+    from email.mime.text import MIMEText
+    from email.mime.application import MIMEApplication
+
+    creds = google_tools.get_credentials()
+    service_sheets = build('sheets', 'v4', credentials=creds)
+    service_gmail = build('gmail', 'v1', credentials=creds)
+
+    row_num = None
+    try:
+        res = service_sheets.spreadsheets().values().get(
+            spreadsheetId=SPREADSHEET_ID,
+            range="'תדלוקים 2026'!A2:I60"
+        ).execute()
+        rows = res.get('values', [])
+        for idx, r in enumerate(rows, start=2):
+            r_url = r[6] if len(r) > 6 else ''
+            r_pdf = r[7] if len(r) > 7 else ''
+            if (receipt_url and r_url == receipt_url) or (pdf_url and r_pdf == pdf_url):
+                row_num = idx
+                date = date or (r[0] if len(r) > 0 else '')
+                total = total or (r[2] if len(r) > 2 else '')
+                station = station or (r[5] if len(r) > 5 else 'סונול')
+                pdf_url = pdf_url or r_pdf
+                receipt_url = receipt_url or r_url
+                break
+    except Exception as e:
+        print(f"Sheet lookup warning: {e}")
+
+    if not pdf_url:
+        return {'success': False, 'message': 'לא נמצא קישור תקין לקובץ ה-PDF של הקבלה'}
+
+    # 1. Download PDF
+    req = urllib.request.Request(pdf_url, headers={'User-Agent': 'Mozilla/5.0'})
+    try:
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            pdf_bytes = resp.read()
+    except Exception as e:
+        return {'success': False, 'message': f'שגיאה בהורדת קובץ ה-PDF: {str(e)}'}
+
+    if not pdf_bytes or len(pdf_bytes) < 100:
+        return {'success': False, 'message': 'קובץ ה-PDF ריק או פגום'}
+
+    clean_date = str(date or datetime.now().strftime('%d/%m/%Y')).replace('/', '-')
+    clean_total = str(total or '')
+    clean_station = str(station or 'סונול')
+
+    # 2. Construct Email to Morning
+    msg = MIMEMultipart()
+    msg['To'] = MORNING_EXPENSE_EMAIL
+    msg['From'] = GMAIL_SENDER_EMAIL
+    msg['Subject'] = f"הוצאת דלק - {clean_station} - {clean_total} ש\"ח ({clean_date})"
+
+    body_text = f"""שלום למערכת מורנינג (Morning),
+
+מצורפת קבלה דיגיטלית של הוצאת דלק:
+- תחנת דלק: {clean_station}
+- תאריך תדלוק: {date or clean_date}
+- סכום לתשלום: {clean_total} ₪
+- אמצעי תשלום: כרטיס אשראי
+- קישור למסמך מקורי: {receipt_url or ''}
+
+הקבלה הועברה ישירות ממערכת ניהול הדלק (FullTank).
+"""
+    msg.attach(MIMEText(body_text, 'plain', 'utf-8'))
+
+    pdf_filename = f"Sonol_{clean_station}_{clean_date}_{clean_total}NIS.pdf".replace(' ', '_').replace('"', '')
+    part = MIMEApplication(pdf_bytes, Name=pdf_filename)
+    part['Content-Disposition'] = f'attachment; filename="{pdf_filename}"'
+    msg.attach(part)
+
+    # 3. Send via Gmail API
+    try:
+        raw = base64.urlsafe_b64encode(msg.as_bytes()).decode()
+        sent_res = service_gmail.users().messages().send(userId='me', body={'raw': raw}).execute()
+        sent_msg_id = sent_res.get('id')
+    except Exception as e:
+        return {'success': False, 'message': f'שגיאה בשליחת המייל דרך Gmail API: {str(e)}'}
+
+    sent_time_str = datetime.now().strftime('%d/%m/%Y %H:%M')
+
+    # 4. Persist in car_state.json
+    state = load_car_state()
+    state.setdefault('morning_expenses', {})
+    key = receipt_url or pdf_url
+    state['morning_expenses'][key] = {
+        'sent_at': sent_time_str,
+        'message_id': sent_msg_id,
+        'total': clean_total,
+        'date': date,
+        'station': clean_station
+    }
+    save_car_state(state)
+
+    # 5. Persist in Google Sheet Column I
+    if row_num:
+        try:
+            service_sheets.spreadsheets().values().update(
+                spreadsheetId=SPREADSHEET_ID,
+                range=f"'תדלוקים 2026'!I{row_num}",
+                valueInputOption='USER_ENTERED',
+                body={'values': [[f"נשלח ({datetime.now().strftime('%d/%m/%Y')})"]]}
+            ).execute()
+        except Exception as e:
+            print(f"Error updating sheets column I: {e}")
+
+    return {
+        'success': True,
+        'message': f'הקבלה על סך {clean_total} ₪ נשלחה בהצלחה למורנינג!',
+        'sent_at': sent_time_str,
+        'receipt_url': key
+    }

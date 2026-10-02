@@ -932,8 +932,23 @@
           const borderClass = idx === 0 ? 'border-r-4 border-r-bordeaux-600' : 'border-r-4 border-r-metal-700';
           const item = document.createElement('div');
           item.className = `metallic-card rounded-2xl p-3 flex items-center justify-between ${borderClass} transition hover:bg-metal-850/60`;
+
+          const pdfLink = r.pdf 
+            ? `<a href="${r.pdf}" target="_blank" class="text-[10px] text-metal-300 hover:text-white flex items-center gap-1 bg-metal-800/80 px-2 py-0.5 rounded-lg border border-metal-700/60 transition"><i class="fa-solid fa-file-pdf text-rose-400 text-[10px]"></i> קבלה</a>`
+            : '';
+
+          const morningAction = r.morning_sent
+            ? `<span class="inline-flex items-center gap-1 text-[10px] text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-lg border border-emerald-500/20 font-bold" title="${r.morning_status || ''}">
+                <i class="fa-solid fa-check"></i> נשלח למורנינג
+               </span>`
+            : (r.pdf ? `
+                <button onclick="sendReceiptToMorning(event, '${r.url}', '${r.pdf}', ${r.total}, '${r.date}', '${r.station ? r.station.replace(/'/g, "\\'") : 'סונול'}', this)" class="inline-flex items-center gap-1 text-[10px] text-sky-400 hover:text-white bg-sky-500/10 hover:bg-sky-600/30 px-2 py-0.5 rounded-lg border border-sky-500/30 font-bold active:scale-95 transition">
+                  <i class="fa-solid fa-paper-plane text-[9px]"></i> שלח למורנינג
+                </button>
+              ` : '');
+
           item.innerHTML = `
-            <div class="text-right">
+            <div class="flex-1 text-right">
               <div class="flex items-center gap-2">
                 <span class="text-xs font-bold text-white">${r.station}</span>
                 <span class="text-[10px] px-1.5 py-0.2 rounded bg-metal-800 text-metal-300 font-mono">${r.date}</span>
@@ -945,8 +960,12 @@
                 <span class="text-metal-600">•</span>
                 <span>מד: <strong class="text-cyanGlow font-mono">${r.km ? Number(r.km).toLocaleString() : '---'}</strong></span>
               </div>
+              <div class="flex items-center gap-2 mt-2 pt-1.5 border-t border-metal-800/80">
+                ${pdfLink}
+                ${morningAction}
+              </div>
             </div>
-            <div class="text-left font-mono font-extrabold text-white text-sm shrink-0">
+            <div class="text-left font-mono font-extrabold text-white text-sm shrink-0 self-start mt-0.5">
               ${Number(r.total).toFixed(2)} ₪
             </div>
           `;
@@ -1391,6 +1410,52 @@
         msg.innerText = 'שגיאת תקשורת: ' + e.message;
         btn.disabled = false;
         btnText.innerText = 'שמור ועדכן מד דלק';
+      }
+    }
+
+    function showToast(text, isError = false) {
+      let toast = document.getElementById('globalToast');
+      if (!toast) {
+        toast = document.createElement('div');
+        toast.id = 'globalToast';
+        document.body.appendChild(toast);
+      }
+      toast.className = `fixed top-5 left-1/2 -translate-x-1/2 z-50 px-4 py-2.5 rounded-2xl text-xs font-bold shadow-2xl backdrop-blur-md transition-all duration-300 pointer-events-none flex items-center gap-2 ${isError ? 'bg-rose-950/95 text-rose-200 border border-rose-500/50 shadow-rose-950/80' : 'bg-emerald-950/95 text-emerald-200 border border-emerald-500/50 shadow-emerald-950/80'} opacity-100 translate-y-0`;
+      toast.innerHTML = text;
+      setTimeout(() => {
+        toast.classList.remove('opacity-100', 'translate-y-0');
+        toast.classList.add('opacity-0', '-translate-y-3');
+      }, 3000);
+    }
+
+    async function sendReceiptToMorning(e, url, pdf, total, date, station, btn) {
+      if (e) e.stopPropagation();
+      if (!btn) return;
+
+      const originalHtml = btn.innerHTML;
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin text-[9px]"></i> שולח...';
+
+      try {
+        const res = await fetch(getApiUrl('/api/send-to-morning'), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url, pdf, total, date, station })
+        });
+        const resp = await res.json();
+        if (res.ok && resp.success) {
+          btn.outerHTML = `<span class="inline-flex items-center gap-1 text-[10px] text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-lg border border-emerald-500/20 font-bold" title="${resp.sent_at}"><i class="fa-solid fa-check"></i> נשלח למורנינג</span>`;
+          showToast('🎉 הקבלה נשלחה בהצלחה למורנינג כהוצאה!');
+          loadStats();
+        } else {
+          btn.disabled = false;
+          btn.innerHTML = originalHtml;
+          showToast('❌ שגיאה: ' + (resp.message || 'לא הצלחנו לשלוח'), true);
+        }
+      } catch (err) {
+        btn.disabled = false;
+        btn.innerHTML = originalHtml;
+        showToast('❌ שגיאת תקשורת: ' + err.message, true);
       }
     }
 
