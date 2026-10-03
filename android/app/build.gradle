@@ -14,7 +14,7 @@ android {
         versionName "5.0"
 
         // Default configurations from gradle.properties (can be overridden in local.properties)
-        buildConfigField "String", "SERVER_URL", "\"${project.findProperty('FULLTANK_SERVER_URL') ?: 'http://127.0.0.1:5088'}\""
+        buildConfigField "String", "SERVER_URL", "\"${project.findProperty('FULLTANK_SERVER_URL') ?: ''}\""
         buildConfigField "String", "SECRET_TOKEN", "\"${project.findProperty('FULLTANK_SECRET_TOKEN') ?: 'demo_token'}\""
         buildConfigField "String", "SPREADSHEET_URL", "\"${project.findProperty('FULLTANK_SPREADSHEET_URL') ?: ''}\""
     }

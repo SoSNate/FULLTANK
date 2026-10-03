@@ -320,6 +320,17 @@ public class MainActivity extends AppCompatActivity {
         }
 
         @JavascriptInterface
+        public String getLocalStatsJson() {
+            org.json.JSONObject stats = FuelDatabaseHelper.getInstance(mContext).getLocalStatsJson();
+            return stats != null ? stats.toString() : "";
+        }
+
+        @JavascriptInterface
+        public boolean updateKmLocally(int km, boolean isFullTank, String source, String notes) {
+            return FuelDatabaseHelper.getInstance(mContext).updateKmLocally(km, isFullTank, source, notes);
+        }
+
+        @JavascriptInterface
         public String getActiveVehiclePlate() {
             return FuelDatabaseHelper.getInstance(mContext).getActiveVehiclePlate();
         }

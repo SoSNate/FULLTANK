@@ -626,4 +626,83 @@ public class FuelDatabaseHelper extends SQLiteOpenHelper {
         }
         return array;
     }
+
+    // ==========================================
+    // OFFLINE / STANDALONE STATS GENERATOR
+    // ==========================================
+
+    public JSONObject getLocalStatsJson() {
+        JSONObject stats = new JSONObject();
+        try {
+            String plate = getActiveVehiclePlate();
+            JSONObject veh = getActiveVehicle();
+            JSONArray allVeh = getAllVehicles();
+            JSONObject ins = getActiveInsurance(plate);
+            JSONArray maint = getAllMaintenance(plate);
+            JSONObject tco = getVehicleTCOSummary(plate);
+            JSONArray refuels = exportRefuelsAsJson();
+
+            double tankCap = veh.optDouble("tank_capacity", 50.0);
+            double avgKml = veh.optDouble("avg_km_per_liter", 14.0);
+            double cityKml = veh.optDouble("city_km_per_liter", 8.0);
+            String testDate = veh.optString("test_expiry_date", "2027-01-01");
+            String tireSize = veh.optString("tire_size", "195/65R15");
+            String carModel = veh.optString("model", "רכב ראשי");
+
+            int latestKm = 150000;
+            SQLiteDatabase db = getReadableDatabase();
+            Cursor cOdo = db.query(TABLE_ODO_LOGS, new String[]{COL_ODO_KM}, COL_ODO_PLATE + " = ?", new String[]{plate}, null, null, COL_ODO_ID + " DESC", "1");
+            if (cOdo != null) {
+                if (cOdo.moveToFirst()) {
+                    latestKm = cOdo.getInt(0);
+                }
+                cOdo.close();
+            } else if (refuels.length() > 0) {
+                latestKm = refuels.getJSONObject(0).optInt("km", 150000);
+            }
+
+            stats.put("status", "success");
+            stats.put("is_configured", true);
+            stats.put("plate", plate);
+            stats.put("car", carModel);
+            stats.put("all_vehicles", allVeh);
+            stats.put("latest_km", latestKm);
+            stats.put("tank_capacity", tankCap);
+            stats.put("current_fuel_liters", tankCap);
+            stats.put("fuel_percent", 100.0);
+            stats.put("estimated_remaining_range", Math.round(tankCap * avgKml));
+            stats.put("city_range", Math.round(tankCap * cityKml));
+            stats.put("avg_km_per_liter", avgKml);
+            stats.put("city_km_per_liter", cityKml);
+            stats.put("avg_cost_per_km", 0.54);
+            stats.put("next_service_km", latestKm + 10000);
+            stats.put("service_remaining_km", 10000);
+            stats.put("recent_refuels", refuels);
+            stats.put("insurance", ins);
+            stats.put("insurance_days_remaining", 180);
+            stats.put("maintenance", maint);
+            stats.put("test_expiry_date", testDate);
+            stats.put("test_days_remaining", 180);
+            stats.put("tire_size", tireSize);
+            stats.put("tco", tco);
+
+            JSONObject morning = new JSONObject();
+            morning.put("email", "");
+            morning.put("sent_count", 0);
+            morning.put("sent_amount", 0.0);
+            morning.put("total_receipts", refuels.length());
+            stats.put("morning_info", morning);
+
+        } catch (Exception ignored) {}
+        return stats;
+    }
+
+    public boolean updateKmLocally(int km, boolean isFullTank, String source, String notes) {
+        String plate = getActiveVehiclePlate();
+        JSONObject veh = getActiveVehicle();
+        double tankCap = veh.optDouble("tank_capacity", 50.0);
+        double fuelLiters = isFullTank ? tankCap : (tankCap * 0.8);
+        long id = insertOdometerLog(null, km, 0, fuelLiters, source != null ? source : "מקומי", notes != null ? notes : "", plate);
+        return id != -1;
+    }
 }

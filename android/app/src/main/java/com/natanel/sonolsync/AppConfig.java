@@ -57,9 +57,18 @@ public final class AppConfig {
                 .apply();
     }
 
+    public static boolean hasConfiguredServer(Context context) {
+        String server = getServerUrl(context);
+        return server != null && !server.trim().isEmpty();
+    }
+
     // Dynamic URL builders taking context
     public static String getDashboardUrl(Context context) {
-        return getServerUrl(context) + "/dashboard";
+        String server = getServerUrl(context);
+        if (server == null || server.trim().isEmpty()) {
+            return "file:///android_asset/dashboard.html";
+        }
+        return server + "/dashboard";
     }
 
     public static String getStatsUrl(Context context) {
@@ -76,6 +85,9 @@ public final class AppConfig {
 
     // Static fallbacks for places without Context
     public static String getDashboardUrl() {
+        if (DEFAULT_SERVER_URL == null || DEFAULT_SERVER_URL.trim().isEmpty()) {
+            return "file:///android_asset/dashboard.html";
+        }
         return DEFAULT_SERVER_URL + "/dashboard";
     }
 
