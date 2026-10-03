@@ -28,20 +28,25 @@ APK_PATH = os.environ.get('APK_PATH', os.path.join(os.path.dirname(os.path.dirna
 DASHBOARD_FILE = os.environ.get('DASHBOARD_FILE', os.path.join(os.path.dirname(os.path.abspath(__file__)), 'dashboard.html'))
 
 def append_receipt_to_sheets(receipt):
+    spreadsheet_id = fuel_dashboard.get_spreadsheet_id()
+    if not spreadsheet_id:
+        print("Warning: Google Sheets not configured. Skipping sheets write.")
+        return "Not configured"
+
     creds = google_tools.get_credentials()
     service = build('sheets', 'v4', credentials=creds)
     
     tab_name = f"תדלוקים {receipt['year']}"
     
     # Check if tab exists, else use current year tab
-    meta = service.spreadsheets().get(spreadsheetId=SPREADSHEET_ID).execute()
+    meta = service.spreadsheets().get(spreadsheetId=spreadsheet_id).execute()
     sheet_names = [s['properties']['title'] for s in meta.get('sheets', [])]
     if tab_name not in sheet_names:
         tab_name = 'תדלוקים 2026'
 
     # Check for duplicate receipt by URL or doc_id
     res_urls = service.spreadsheets().values().get(
-        spreadsheetId=SPREADSHEET_ID,
+        spreadsheetId=spreadsheet_id,
         range=f"'{tab_name}'!G1:G100"
     ).execute()
     existing_urls = [r[0] for r in res_urls.get('values', []) if r]
@@ -53,7 +58,7 @@ def append_receipt_to_sheets(receipt):
             print(f"Receipt {receipt['doc_id']} already exists at row {row_num} of {tab_name}. Skipping append.")
             if receipt.get('km'):
                 service.spreadsheets().values().update(
-                    spreadsheetId=SPREADSHEET_ID,
+                    spreadsheetId=spreadsheet_id,
                     range=f"'{tab_name}'!B{row_num}",
                     valueInputOption='USER_ENTERED',
                     body={'values': [[receipt['km']]]}
@@ -72,7 +77,7 @@ def append_receipt_to_sheets(receipt):
     ]
     
     res = service.spreadsheets().values().append(
-        spreadsheetId=SPREADSHEET_ID,
+        spreadsheetId=spreadsheet_id,
         range=f"'{tab_name}'!A1",
         valueInputOption='USER_ENTERED',
         body={'values': [row]}
@@ -83,11 +88,15 @@ def append_receipt_to_sheets(receipt):
     return updated_range
 
 def update_last_km_in_sheets(km_value, tab_name='תדלוקים 2026', only_if_empty=False):
+    spreadsheet_id = fuel_dashboard.get_spreadsheet_id()
+    if not spreadsheet_id:
+        return False, "Sheets not configured"
+
     creds = google_tools.get_credentials()
     service = build('sheets', 'v4', credentials=creds)
     
     res = service.spreadsheets().values().get(
-        spreadsheetId=SPREADSHEET_ID,
+        spreadsheetId=spreadsheet_id,
         range=f"'{tab_name}'!A1:B100"
     ).execute()
     rows = res.get('values', [])
@@ -104,7 +113,7 @@ def update_last_km_in_sheets(km_value, tab_name='תדלוקים 2026', only_if_e
     cell = f"'{tab_name}'!B{last_row_index}"
     
     service.spreadsheets().values().update(
-        spreadsheetId=SPREADSHEET_ID,
+        spreadsheetId=spreadsheet_id,
         range=cell,
         valueInputOption='USER_ENTERED',
         body={'values': [[km_value]]}
@@ -116,13 +125,18 @@ def update_last_km_in_sheets(km_value, tab_name='תדלוקים 2026', only_if_e
 def append_odometer_log(km_value, source='אנדרואיד אוטו (מסך רכב)', is_full_tank=False, notes=''):
     """Logs driving odometer check-ins to a dedicated Google Sheets tab 'יומן נסועה וכיול'."""
     try:
+        spreadsheet_id = fuel_dashboard.get_spreadsheet_id()
+        if not spreadsheet_id:
+            print("Warning: Google Sheets not configured. Skipping odometer log append.")
+            return False
+
         creds = google_tools.get_credentials()
         service = build('sheets', 'v4', credentials=creds)
         
         car_state = fuel_dashboard.load_car_state()
         tank_cap = float(car_state.get('tank_capacity', 50.0))
-        full_km = int(car_state.get('full_tank_refuel_km', 162024))
-        avg_km_l = float(car_state.get('avg_km_per_liter', 14.24))
+        full_km = int(car_state.get('full_tank_refuel_km', 150000))
+        avg_km_l = float(car_state.get('avg_km_per_liter', 14.0))
         
         km_int = int(str(km_value).replace(',', '').replace(' ', ''))
         km_since_full = max(0, km_int - full_km)
@@ -147,7 +161,7 @@ def append_odometer_log(km_value, source='אנדרואיד אוטו (מסך רכ
         ]
         
         service.spreadsheets().values().append(
-            spreadsheetId=SPREADSHEET_ID,
+            spreadsheetId=spreadsheet_id,
             range="'יומן נסועה וכיול'!A:H",
             valueInputOption='USER_ENTERED',
             insertDataOption='INSERT_ROWS',
@@ -276,6 +290,31 @@ class FuelWebhookHandler(BaseHTTPRequestHandler):
             self.wfile.write(json.dumps(res_data, ensure_ascii=False).encode('utf-8'))
             return
 
+        # 2.55 System Settings API: /api/settings
+        if parsed.path == '/api/settings':
+            state = fuel_dashboard.load_car_state()
+            active_veh = fuel_dashboard.get_active_vehicle(state)
+            sheet_id = fuel_dashboard.get_spreadsheet_id(state)
+            morning_email = fuel_dashboard.get_morning_expense_email(state)
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/json; charset=utf-8')
+            self.send_cors_headers()
+            self.end_headers()
+            self.wfile.write(json.dumps({
+                'status': 'success',
+                'is_configured': bool(sheet_id),
+                'spreadsheet_id': sheet_id,
+                'spreadsheet_url': f"https://docs.google.com/spreadsheets/d/{sheet_id}/edit" if sheet_id else "",
+                'morning_expense_email': morning_email,
+                'active_plate': state.get('active_plate', '12-345-67'),
+                'car_model': active_veh.get('car_model', 'רכב ראשי'),
+                'tank_capacity': active_veh.get('tank_capacity', 50.0),
+                'avg_km_per_liter': active_veh.get('avg_km_per_liter', 14.0),
+                'city_km_per_liter': active_veh.get('city_km_per_liter', 8.0),
+                'test_expiry_date': active_veh.get('test_expiry_date', '2027-01-01')
+            }, ensure_ascii=False).encode('utf-8'))
+            return
+
         # 2.6 Get Car Settings: /api/car-settings
         if parsed.path == '/api/car-settings':
             settings = fuel_dashboard.load_car_state()
@@ -295,7 +334,7 @@ class FuelWebhookHandler(BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(json.dumps({
                 'status': 'success',
-                'active_plate': state.get('active_plate', '86-369-79'),
+                'active_plate': state.get('active_plate', '12-345-67'),
                 'vehicles': state.get('vehicles', [])
             }, ensure_ascii=False).encode('utf-8'))
             return
@@ -303,7 +342,7 @@ class FuelWebhookHandler(BaseHTTPRequestHandler):
         # 2.8 Insurance API: /api/insurance?plate=...
         if parsed.path == '/api/insurance':
             state = fuel_dashboard.load_car_state()
-            plate = qs.get('plate', [state.get('active_plate', '86-369-79')])[0]
+            plate = qs.get('plate', [state.get('active_plate', '12-345-67')])[0]
             ins = state.get('insurance', {}).get(plate, {})
             self.send_response(200)
             self.send_header('Content-Type', 'application/json; charset=utf-8')
@@ -315,7 +354,7 @@ class FuelWebhookHandler(BaseHTTPRequestHandler):
         # 2.9 Maintenance API: /api/maintenance?plate=...
         if parsed.path == '/api/maintenance':
             state = fuel_dashboard.load_car_state()
-            plate = qs.get('plate', [state.get('active_plate', '86-369-79')])[0]
+            plate = qs.get('plate', [state.get('active_plate', '12-345-67')])[0]
             maint = state.get('maintenance', {}).get(plate, [])
             self.send_response(200)
             self.send_header('Content-Type', 'application/json; charset=utf-8')
@@ -420,6 +459,33 @@ class FuelWebhookHandler(BaseHTTPRequestHandler):
                     'km': km_int,
                     'is_refuel': is_refuel_event
                 }).encode('utf-8'))
+                return
+            except Exception as e:
+                self.send_response(500)
+                self.send_cors_headers()
+                self.end_headers()
+                self.wfile.write(json.dumps({'status': 'error', 'message': str(e)}).encode('utf-8'))
+                return
+
+        # 1.45 Save System Settings endpoint: /api/settings
+        if parsed.path == '/api/settings':
+            try:
+                data = json.loads(body)
+                success, state = fuel_dashboard.save_system_settings(data)
+                self.send_response(200 if success else 400)
+                self.send_header('Content-Type', 'application/json; charset=utf-8')
+                self.send_cors_headers()
+                self.end_headers()
+                self.wfile.write(json.dumps({
+                    'status': 'success' if success else 'error',
+                    'message': 'ההגדרות נשמרו בהצלחה' if success else 'שגיאה בשמירת ההגדרות',
+                    'is_configured': bool(fuel_dashboard.get_spreadsheet_id(state)),
+                    'settings': {
+                        'spreadsheet_id': fuel_dashboard.get_spreadsheet_id(state),
+                        'morning_expense_email': fuel_dashboard.get_morning_expense_email(state),
+                        'active_plate': state.get('active_plate', '12-345-67')
+                    }
+                }, ensure_ascii=False).encode('utf-8'))
                 return
             except Exception as e:
                 self.send_response(500)

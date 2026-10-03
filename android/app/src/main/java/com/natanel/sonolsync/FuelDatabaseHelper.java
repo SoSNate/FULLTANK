@@ -177,7 +177,7 @@ public class FuelDatabaseHelper extends SQLiteOpenHelper {
                 COL_VEH_PLATE + ", " + COL_VEH_MODEL + ", " + COL_VEH_TANK + ", " +
                 COL_VEH_AVG_KML + ", " + COL_VEH_CITY_KML + ", " + COL_VEH_TEST_DATE + ", " +
                 COL_VEH_TIRES + ", " + COL_VEH_IS_ACTIVE + ") VALUES " +
-                "('86-369-79', 'טויוטה קורולה GLI 2012 ידנית 1.6L', 50.0, 14.24, 7.9, '2026-12-24', '195/65R15', 1)");
+                "('12-345-67', 'רכב ראשי', 50.0, 14.0, 8.0, '2027-01-01', '195/65R15', 1)");
     }
 
     @Override
@@ -231,7 +231,7 @@ public class FuelDatabaseHelper extends SQLiteOpenHelper {
     public String getActiveVehiclePlate() {
         SQLiteDatabase db = getReadableDatabase();
         Cursor c = db.query(TABLE_VEHICLES, new String[]{COL_VEH_PLATE}, COL_VEH_IS_ACTIVE + " = 1", null, null, null, null, "1");
-        String plate = "86-369-79";
+        String plate = "12-345-67";
         if (c != null) {
             if (c.moveToFirst()) {
                 plate = c.getString(c.getColumnIndexOrThrow(COL_VEH_PLATE));
@@ -320,12 +320,12 @@ public class FuelDatabaseHelper extends SQLiteOpenHelper {
                 obj.put("is_active", 1);
             } else {
                 // Default fallback
-                obj.put("plate", "86-369-79");
-                obj.put("model", "טויוטה קורולה GLI 2012 ידנית 1.6L");
+                obj.put("plate", "12-345-67");
+                obj.put("model", "רכב ראשי");
                 obj.put("tank_capacity", 50.0);
-                obj.put("avg_km_per_liter", 14.24);
-                obj.put("city_km_per_liter", 7.9);
-                obj.put("test_expiry_date", "2026-12-24");
+                obj.put("avg_km_per_liter", 14.0);
+                obj.put("city_km_per_liter", 8.0);
+                obj.put("test_expiry_date", "2027-01-01");
                 obj.put("tire_size", "195/65R15");
                 obj.put("is_active", 1);
             }

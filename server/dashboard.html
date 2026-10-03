@@ -124,7 +124,7 @@
             <h1 id="headerCarName" class="font-black text-sm text-white tracking-wide leading-tight">פוול טנק</h1>
             <!-- Interactive Plate Switcher Badge -->
             <button onclick="openCarSettingsModal()" title="החלף רכב / הגדרות" class="mt-1 inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-lg bg-amber-400 text-black font-black font-mono text-xs border border-amber-500 shadow-sm hover:brightness-105 active:scale-95 transition cursor-pointer">
-              <span id="headerPlateBadge">86-369-79</span>
+              <span id="headerPlateBadge">12-345-67</span>
               <i class="fa-solid fa-chevron-down text-[9px] opacity-70"></i>
             </button>
           </div>
@@ -132,6 +132,9 @@
 
         <!-- Header Action Buttons -->
         <div class="flex items-center gap-2">
+          <button onclick="openSystemSettingsModal()" title="הגדרות מערכת וחיבורים" class="w-10 h-10 rounded-2xl bg-metal-850 hover:bg-metal-800 active:scale-95 transition flex items-center justify-center text-metal-300 hover:text-white border border-metal-700/50 shadow-sm">
+            <i class="fa-solid fa-gear text-sm"></i>
+          </button>
           <button onclick="openGoogleSheets()" title="פתח Google Sheets" class="w-10 h-10 rounded-2xl bg-metal-850 hover:bg-metal-800 active:scale-95 transition flex items-center justify-center text-emerald-400 hover:text-white border border-metal-700/50 shadow-sm">
             <i class="fa-solid fa-table text-sm"></i>
           </button>
@@ -157,6 +160,23 @@
         </button>
       </nav>
     </header>
+
+    <!-- Setup / Onboarding Banner (shown if Google Sheets not yet connected) -->
+    <div id="setupBanner" class="hidden mx-4 mt-3 p-4 rounded-2xl bg-gradient-to-r from-amber-500/20 via-metal-900 to-metal-900 border border-amber-500/40 shadow-lg text-right">
+      <div class="flex items-start gap-3">
+        <div class="w-10 h-10 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center shrink-0 text-lg">
+          <i class="fa-solid fa-wand-magic-sparkles"></i>
+        </div>
+        <div class="flex-1">
+          <h3 class="text-sm font-bold text-white mb-0.5">ברוכים הבאים ל-FullTank! ⛽</h3>
+          <p class="text-xs text-metal-300 mb-2.5 leading-relaxed">המערכת מוכנה לחיבור. הזן את קובץ ה-Google Sheets שלך ומייל Morning/רו״ח לקבלת אוטומציה מלאה.</p>
+          <button onclick="openSystemSettingsModal()" class="px-3.5 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-black text-xs font-black flex items-center gap-1.5 transition shadow active:scale-95">
+            <i class="fa-solid fa-gear text-[11px]"></i>
+            <span>הגדר מערכת עכשיו (2 דק')</span>
+          </button>
+        </div>
+      </div>
+    </div>
 
     <!-- Simulated SMS Incoming Notification Toast -->
     <div id="smsNotificationToast" class="hidden mx-3 mt-2.5 p-3 rounded-2xl bg-gradient-to-r from-metal-900 to-metal-850 border border-bordeaux-700/70 shadow-xl shadow-bordeaux-950/50 flex items-center justify-between animate-pulse">
@@ -716,7 +736,7 @@
                 <span>IL</span>
                 <span>ישראל</span>
               </div>
-              <input type="text" id="carPlateInput" inputmode="numeric" placeholder="8636979" value="8636979" class="w-full bg-transparent text-black font-mono font-black text-2xl tracking-widest text-center outline-none">
+              <input type="text" id="carPlateInput" inputmode="numeric" placeholder="1234567" value="1234567" class="w-full bg-transparent text-black font-mono font-black text-2xl tracking-widest text-center outline-none">
             </div>
           </div>
           <button id="lookupCarBtn" onclick="lookupPlateData()" class="px-4 bg-bordeaux-700 hover:bg-bordeaux-600 active:scale-95 text-white font-bold text-xs rounded-2xl flex flex-col items-center justify-center gap-1 shrink-0 border border-bordeaux-600/50 shadow-md">
@@ -747,7 +767,7 @@
         <div class="bg-metal-950/80 p-3 rounded-2xl border border-metal-800">
           <label class="block text-[11px] font-bold text-metal-300 mb-1">מד אוץ נוכחי (ק"מ):</label>
           <div class="relative">
-            <input type="number" id="carCurrentKmInput" value="162094" class="w-full h-11 bg-metal-900 border border-metal-700 rounded-xl px-3 text-base font-mono font-bold text-white text-center outline-none focus:border-cyan-400">
+            <input type="number" id="carCurrentKmInput" placeholder="150000" class="w-full h-11 bg-metal-900 border border-metal-700 rounded-xl px-3 text-base font-mono font-bold text-white text-center outline-none focus:border-cyan-400">
             <span class="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-metal-400 font-sans">ק"מ</span>
           </div>
         </div>
@@ -815,6 +835,101 @@
       <div id="simFeedbackMsg" class="mt-2 text-center text-xs font-semibold hidden"></div>
     </div>
 
+    <!-- System Settings & Integrations Bottom Sheet -->
+    <div id="systemSettingsSheet" class="fixed bottom-0 left-0 right-0 z-50 max-w-[480px] mx-auto bg-metal-900 border-t-2 border-amber-500/70 rounded-t-3xl p-5 shadow-2xl transform translate-y-full sheet-transition text-right max-h-[90vh] overflow-y-auto">
+      <div class="w-12 h-1.5 bg-metal-700 rounded-full mx-auto mb-4 cursor-pointer" onclick="closeAllSheets()"></div>
+
+      <div class="flex items-center justify-between mb-4">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-2xl bg-amber-500/20 border border-amber-500/40 text-amber-400 flex items-center justify-center text-base shadow-sm">
+            <i class="fa-solid fa-gear"></i>
+          </div>
+          <div>
+            <h3 class="font-extrabold text-lg text-white">הגדרות מערכת וחיבורים</h3>
+            <p class="text-xs text-metal-300">הגדרת Google Sheets, מייל הוצאות ופרופיל רכב</p>
+          </div>
+        </div>
+        <button onclick="closeAllSheets()" class="w-9 h-9 rounded-xl bg-metal-800 text-metal-400 hover:text-white flex items-center justify-center">
+          <i class="fa-solid fa-xmark text-base"></i>
+        </button>
+      </div>
+
+      <div class="space-y-4 my-2">
+        <!-- Google Sheets Integration -->
+        <div class="bg-metal-950/80 p-3.5 rounded-2xl border border-metal-800 space-y-2">
+          <label class="block text-xs font-bold text-emerald-400 flex items-center justify-between">
+            <span class="flex items-center gap-1.5"><i class="fa-solid fa-table"></i> קובץ Google Sheets (קישור או ID):</span>
+            <span id="sheetStatusBadge" class="text-[10px] text-metal-400 font-normal">לא מחובר</span>
+          </label>
+          <input type="text" id="settingsSheetIdInput" placeholder="הדבק כאן קישור מלא או מזהה קובץ Sheets" class="w-full h-11 bg-metal-900 border border-metal-700 rounded-xl px-3 text-xs font-mono text-white outline-none focus:border-emerald-400">
+          <p class="text-[11px] text-metal-400 leading-relaxed">
+            💡 <strong>איך להגדיר?</strong> פתח קובץ Google Sheets חדש עם הלשוניות "תדלוקים 2026" ו-"יומן נסועה וכיול", שתף אותו להרשאת עריכה, והדבק את הקישור כאן.
+          </p>
+        </div>
+
+        <!-- Morning / Accountant Forwarding Email -->
+        <div class="bg-metal-950/80 p-3.5 rounded-2xl border border-metal-800 space-y-2">
+          <label class="block text-xs font-bold text-sky-400 flex items-center gap-1.5">
+            <i class="fa-solid fa-paper-plane"></i> מייל לעדכון הוצאות (Morning / רו״ח):
+          </label>
+          <input type="email" id="settingsMorningEmailInput" placeholder="xxx@expenses.morning.co או מייל רואה חשבון" class="w-full h-11 bg-metal-900 border border-metal-700 rounded-xl px-3 text-xs font-mono text-white outline-none focus:border-sky-400">
+          <p class="text-[11px] text-metal-400 leading-relaxed">
+            בלחיצה על "שלח למורנינג" ברשימת הקבלות, קובץ ה-PDF יועבר ישירות לכתובת זו לצורך רישום כהוצאה מוכרת.
+          </p>
+        </div>
+
+        <!-- Vehicle Details -->
+        <div class="bg-metal-950/80 p-3.5 rounded-2xl border border-metal-800 space-y-3">
+          <label class="block text-xs font-bold text-amber-400 flex items-center gap-1.5">
+            <i class="fa-solid fa-car-side"></i> פרופיל רכב ראשי:
+          </label>
+
+          <div class="grid grid-cols-2 gap-2.5">
+            <div>
+              <label class="block text-[11px] font-bold text-metal-300 mb-1">מספר רישוי:</label>
+              <input type="text" id="settingsPlateInput" placeholder="12-345-67" class="w-full h-10 bg-metal-900 border border-metal-700 rounded-xl px-3 text-xs font-mono font-bold text-white text-center outline-none focus:border-amber-400">
+            </div>
+            <div>
+              <label class="block text-[11px] font-bold text-metal-300 mb-1">דגם רכב ושנה:</label>
+              <input type="text" id="settingsModelInput" placeholder="רכב ראשי" class="w-full h-10 bg-metal-900 border border-metal-700 rounded-xl px-3 text-xs text-white outline-none focus:border-amber-400">
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 gap-2.5">
+            <div>
+              <label class="block text-[11px] font-bold text-metal-300 mb-1">נפח מיכל (ליטר):</label>
+              <input type="number" id="settingsTankInput" placeholder="50" class="w-full h-10 bg-metal-900 border border-metal-700 rounded-xl px-3 text-xs font-mono text-white text-center outline-none focus:border-amber-400">
+            </div>
+            <div>
+              <label class="block text-[11px] font-bold text-metal-300 mb-1">ק"מ לליטר:</label>
+              <input type="number" step="0.1" id="settingsAvgKmInput" placeholder="14.0" class="w-full h-10 bg-metal-900 border border-metal-700 rounded-xl px-3 text-xs font-mono text-white text-center outline-none focus:border-amber-400">
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-[11px] font-bold text-metal-300 mb-1">תאריך פקיעת טסט:</label>
+            <input type="date" id="settingsTestDateInput" class="w-full h-10 bg-metal-900 border border-metal-700 rounded-xl px-3 text-xs font-mono text-white text-center outline-none focus:border-amber-400">
+          </div>
+        </div>
+
+        <!-- Secret Auth Token -->
+        <div class="bg-metal-950/80 p-3.5 rounded-2xl border border-metal-800 space-y-2">
+          <label class="block text-xs font-bold text-metal-300 flex items-center gap-1.5">
+            <i class="fa-solid fa-key"></i> טוקן סודי לאימות (Secret Token):
+          </label>
+          <input type="text" id="settingsSecretTokenInput" placeholder="demo_secret_token" class="w-full h-10 bg-metal-900 border border-metal-700 rounded-xl px-3 text-xs font-mono text-white outline-none focus:border-amber-400">
+          <p class="text-[10px] text-metal-400">מאפשר לדפדפן ולאפליקציה לתקשר באופן מאובטח עם השרת.</p>
+        </div>
+      </div>
+
+      <button onclick="saveSystemSettings()" class="w-full h-13 py-3.5 bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-500 hover:to-amber-600 text-white font-bold rounded-2xl flex items-center justify-center gap-2 active:scale-[0.98] transition shadow-lg shadow-amber-950/60 mt-3">
+        <i class="fa-solid fa-floppy-disk"></i>
+        <span>שמור הגדרות מערכת</span>
+      </button>
+
+      <div id="systemSettingsFeedbackMsg" class="mt-2.5 text-center text-xs font-semibold hidden"></div>
+    </div>
+
   </div>
 
   <script>
@@ -822,7 +937,7 @@
     let fuelChartInstance = null;
 
     const urlParams = new URLSearchParams(window.location.search);
-    const AUTH_TOKEN = urlParams.get('token') || '';
+    let AUTH_TOKEN = urlParams.get('token') || localStorage.getItem('fulltank_token') || 'demo_secret_token';
 
     function getApiUrl(path) {
       if (!AUTH_TOKEN) return path;
@@ -836,7 +951,7 @@
       } else if (currentStats && currentStats.spreadsheet_url) {
         window.open(currentStats.spreadsheet_url, '_blank');
       } else {
-        alert("נא להגדיר קישור ל-Google Sheets בהגדרות המערכת");
+        openSystemSettingsModal();
       }
     }
 
@@ -882,11 +997,21 @@
     function renderUI(data) {
       // 1. Header & Plate
       const headerPlateBadge = document.getElementById('headerPlateBadge');
-      if (headerPlateBadge) headerPlateBadge.innerText = data.plate || '86-369-79';
+      if (headerPlateBadge) headerPlateBadge.innerText = data.plate || '12-345-67';
       
       const headerCarName = document.getElementById('headerCarName');
       if (headerCarName) {
         headerCarName.innerText = `פוול טנק • ${data.car ? (data.car.includes('קורולה') ? 'קורולה' : data.car.substring(0, 16)) : 'רכב'}`;
+      }
+
+      // Check setup status
+      const setupBanner = document.getElementById('setupBanner');
+      if (setupBanner) {
+        if (data.is_configured === false) {
+          setupBanner.classList.remove('hidden');
+        } else {
+          setupBanner.classList.add('hidden');
+        }
       }
 
       // 2. Fuel View
@@ -1139,7 +1264,7 @@
     }
 
     function closeAllSheets() {
-      const sheets = ['odometerSheet', 'carSettingsSheet', 'insuranceSheet', 'maintenanceSheet', 'simulationSheet'];
+      const sheets = ['odometerSheet', 'carSettingsSheet', 'insuranceSheet', 'maintenanceSheet', 'simulationSheet', 'systemSettingsSheet'];
       sheets.forEach(id => {
         const el = document.getElementById(id);
         if (el) el.classList.add('translate-y-full');
@@ -1148,6 +1273,90 @@
       if (bd) {
         bd.classList.add('opacity-0');
         setTimeout(() => bd.classList.add('hidden'), 300);
+      }
+    }
+
+    async function openSystemSettingsModal() {
+      closeAllSheets();
+      document.getElementById('sheetBackdrop').classList.remove('hidden');
+      setTimeout(() => document.getElementById('sheetBackdrop').classList.remove('opacity-0'), 10);
+      document.getElementById('systemSettingsSheet').classList.remove('translate-y-full');
+
+      const tokenInput = document.getElementById('settingsSecretTokenInput');
+      if (tokenInput) tokenInput.value = AUTH_TOKEN || '';
+
+      try {
+        const res = await fetch(getApiUrl('/api/settings'));
+        const d = await res.json();
+        if (d && d.status === 'success') {
+          if (d.spreadsheet_id) {
+            document.getElementById('settingsSheetIdInput').value = d.spreadsheet_url || d.spreadsheet_id;
+            const badge = document.getElementById('sheetStatusBadge');
+            if (badge) {
+              badge.innerText = 'מחובר ✅';
+              badge.className = 'text-[10px] text-emerald-400 font-bold';
+            }
+          }
+          if (d.morning_expense_email) {
+            document.getElementById('settingsMorningEmailInput').value = d.morning_expense_email;
+          }
+          if (d.active_plate) document.getElementById('settingsPlateInput').value = d.active_plate;
+          if (d.car_model) document.getElementById('settingsModelInput').value = d.car_model;
+          if (d.tank_capacity) document.getElementById('settingsTankInput').value = d.tank_capacity;
+          if (d.avg_km_per_liter) document.getElementById('settingsAvgKmInput').value = d.avg_km_per_liter;
+          if (d.test_expiry_date) document.getElementById('settingsTestDateInput').value = d.test_expiry_date;
+        }
+      } catch (e) {
+        console.warn("Could not fetch /api/settings:", e);
+      }
+    }
+
+    async function saveSystemSettings() {
+      const feedback = document.getElementById('systemSettingsFeedbackMsg');
+      feedback.classList.remove('hidden');
+      feedback.innerText = 'שומר הגדרות מערכת...';
+      feedback.className = 'mt-2.5 text-center text-xs font-semibold text-metal-300';
+
+      const newToken = document.getElementById('settingsSecretTokenInput').value.trim();
+      if (newToken) {
+        localStorage.setItem('fulltank_token', newToken);
+        AUTH_TOKEN = newToken;
+      }
+
+      const payload = {
+        spreadsheet_id: document.getElementById('settingsSheetIdInput').value.trim(),
+        morning_expense_email: document.getElementById('settingsMorningEmailInput').value.trim(),
+        active_plate: document.getElementById('settingsPlateInput').value.trim(),
+        car_model: document.getElementById('settingsModelInput').value.trim(),
+        tank_capacity: document.getElementById('settingsTankInput').value,
+        avg_km_per_liter: document.getElementById('settingsAvgKmInput').value,
+        test_expiry_date: document.getElementById('settingsTestDateInput').value
+      };
+
+      try {
+        const res = await fetch(getApiUrl('/api/settings'), {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Auth-Token': AUTH_TOKEN
+          },
+          body: JSON.stringify(payload)
+        });
+        const d = await res.json();
+        if (d && d.status === 'success') {
+          feedback.innerText = '✅ ההגדרות נשמרו בהצלחה!';
+          feedback.className = 'mt-2.5 text-center text-xs font-semibold text-emerald-400';
+          setTimeout(() => {
+            closeAllSheets();
+            loadStats();
+          }, 900);
+        } else {
+          feedback.innerText = '❌ ' + (d.message || 'שגיאה בשמירת הגדרות');
+          feedback.className = 'mt-2.5 text-center text-xs font-semibold text-rose-400';
+        }
+      } catch (e) {
+        feedback.innerText = '❌ שגיאת תקשורת: ' + e.message;
+        feedback.className = 'mt-2.5 text-center text-xs font-semibold text-rose-400';
       }
     }
 

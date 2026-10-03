@@ -14,16 +14,18 @@ if os.path.exists(env_path):
 import google_tools
 from googleapiclient.discovery import build
 
-SPREADSHEET_ID = os.environ.get('SPREADSHEET_ID', 'your_google_sheet_id_here')
+SPREADSHEET_ID = os.environ.get('SPREADSHEET_ID', '')
 CAR_STATE_FILE = os.environ.get('CAR_STATE_FILE', os.path.join(os.path.dirname(os.path.abspath(__file__)), 'car_state.json'))
 
 DEFAULT_STATE = {
     'active_plate': '12-345-67',
+    'spreadsheet_id': '',
+    'morning_expense_email': '',
     'vehicles': [
         {
             'plate': '12-345-67',
             'car_model': 'רכב לדוגמה (שנה)',
-            'tank_capacity': 55.0,
+            'tank_capacity': 50.0,
             'full_tank_refuel_km': 150000,
             'current_odometer': 150000,
             'avg_km_per_liter': 14.0,
@@ -36,7 +38,7 @@ DEFAULT_STATE = {
     'insurance': {
         '12-345-67': {
             'plate': '12-345-67',
-            'insurance_type': 'חובה + צד ג'',
+            'insurance_type': 'חובה + צד ג\'',
             'company': 'חברת ביטוח לדוגמה',
             'start_date': '2027-01-01',
             'end_date': '2028-01-01',
@@ -59,19 +61,19 @@ def load_car_state():
                 saved = json.load(f)
                 # Handle migration from legacy flat format
                 if 'vehicles' not in saved and 'plate' in saved:
-                    legacy_plate = saved.get('plate', '86-369-79')
+                    legacy_plate = saved.get('plate', '12-345-67')
                     state['active_plate'] = legacy_plate
                     state['vehicles'] = [{
                         'plate': legacy_plate,
-                        'car_model': saved.get('car_model', 'טויוטה קורולה GLI 2012'),
+                        'car_model': saved.get('car_model', 'רכב ראשי'),
                         'tank_capacity': float(saved.get('tank_capacity', 50.0)),
-                        'full_tank_refuel_km': int(saved.get('full_tank_refuel_km', 162024)),
-                        'current_odometer': int(saved.get('current_odometer', 162024)),
-                        'avg_km_per_liter': float(saved.get('avg_km_per_liter', 14.24)),
-                        'city_km_per_liter': float(saved.get('city_km_per_liter', 7.90)),
-                        'test_expiry_date': saved.get('test_expiry_date', '2026-12-24'),
+                        'full_tank_refuel_km': int(saved.get('full_tank_refuel_km', 150000)),
+                        'current_odometer': int(saved.get('current_odometer', 150000)),
+                        'avg_km_per_liter': float(saved.get('avg_km_per_liter', 14.0)),
+                        'city_km_per_liter': float(saved.get('city_km_per_liter', 8.0)),
+                        'test_expiry_date': saved.get('test_expiry_date', '2027-01-01'),
                         'tire_size': saved.get('tire_size', '195/65R15'),
-                        'last_full_refuel_date': saved.get('last_full_refuel_date', '10/09/2026')
+                        'last_full_refuel_date': saved.get('last_full_refuel_date', '01/01/2027')
                     }]
                 else:
                     state.update(saved)
@@ -87,10 +89,63 @@ def save_car_state(state):
     except Exception:
         return False
 
+def get_spreadsheet_id(state=None):
+    if state is None:
+        state = load_car_state()
+    return state.get('spreadsheet_id') or os.environ.get('SPREADSHEET_ID', '')
+
+def get_morning_expense_email(state=None):
+    if state is None:
+        state = load_car_state()
+    return state.get('morning_expense_email') or os.environ.get('MORNING_EXPENSE_EMAIL', '')
+
+def save_system_settings(settings_data):
+    """Saves user-configured settings (Spreadsheet ID/URL, Morning email, Car profile)."""
+    state = load_car_state()
+    if 'spreadsheet_id' in settings_data:
+        sid = str(settings_data['spreadsheet_id']).strip()
+        # Automatically extract ID from full Google Sheets URL
+        if 'spreadsheets/d/' in sid:
+            try:
+                sid = sid.split('spreadsheets/d/')[1].split('/')[0]
+            except Exception:
+                pass
+        state['spreadsheet_id'] = sid
+        
+    if 'morning_expense_email' in settings_data:
+        state['morning_expense_email'] = str(settings_data['morning_expense_email']).strip()
+        
+    if 'active_plate' in settings_data and settings_data['active_plate']:
+        state['active_plate'] = str(settings_data['active_plate']).strip()
+        
+    active_veh = get_active_vehicle(state)
+    if 'car_model' in settings_data and settings_data['car_model']:
+        active_veh['car_model'] = str(settings_data['car_model']).strip()
+    if 'tank_capacity' in settings_data and settings_data['tank_capacity']:
+        try:
+            active_veh['tank_capacity'] = float(settings_data['tank_capacity'])
+        except Exception:
+            pass
+    if 'avg_km_per_liter' in settings_data and settings_data['avg_km_per_liter']:
+        try:
+            active_veh['avg_km_per_liter'] = float(settings_data['avg_km_per_liter'])
+        except Exception:
+            pass
+    if 'city_km_per_liter' in settings_data and settings_data['city_km_per_liter']:
+        try:
+            active_veh['city_km_per_liter'] = float(settings_data['city_km_per_liter'])
+        except Exception:
+            pass
+    if 'test_expiry_date' in settings_data and settings_data['test_expiry_date']:
+        active_veh['test_expiry_date'] = str(settings_data['test_expiry_date']).strip()
+        
+    save_car_state(state)
+    return True, state
+
 def get_active_vehicle(state=None):
     if state is None:
         state = load_car_state()
-    active_plate = state.get('active_plate', '86-369-79')
+    active_plate = state.get('active_plate', '12-345-67')
     vehicles = state.get('vehicles', [])
     for v in vehicles:
         if v.get('plate') == active_plate:
@@ -115,9 +170,9 @@ def set_active_vehicle(plate):
             'tank_capacity': 50.0,
             'full_tank_refuel_km': 0,
             'current_odometer': 0,
-            'avg_km_per_liter': 14.24,
-            'city_km_per_liter': 7.90,
-            'test_expiry_date': '2026-12-24',
+            'avg_km_per_liter': 14.0,
+            'city_km_per_liter': 8.0,
+            'test_expiry_date': '2027-01-01',
             'tire_size': '195/65R15',
             'last_full_refuel_date': datetime.now().strftime('%d/%m/%Y')
         })
@@ -150,7 +205,7 @@ def save_vehicle_details(vehicle_data):
 
 def save_insurance_record(ins_data):
     state = load_car_state()
-    plate = str(ins_data.get('plate', state.get('active_plate', '86-369-79'))).strip()
+    plate = str(ins_data.get('plate', state.get('active_plate', '12-345-67'))).strip()
     annual_cost = float(ins_data.get('annual_cost', 0.0))
     monthly_cost = round(annual_cost / 12.0, 2) if annual_cost > 0 else 0.0
     
@@ -172,7 +227,7 @@ def save_insurance_record(ins_data):
 
 def save_maintenance_record(maint_data):
     state = load_car_state()
-    plate = str(maint_data.get('plate', state.get('active_plate', '86-369-79'))).strip()
+    plate = str(maint_data.get('plate', state.get('active_plate', '12-345-67'))).strip()
     
     records = state.setdefault('maintenance', {}).setdefault(plate, [])
     new_id = (max([r.get('id', 0) for r in records], default=0)) + 1
@@ -201,15 +256,81 @@ GMAIL_SENDER_EMAIL = os.environ.get('GMAIL_SENDER_EMAIL', 'user@example.com')
 def get_fuel_data():
     try:
         state = load_car_state()
+        spreadsheet_id = get_spreadsheet_id(state)
+        morning_email = get_morning_expense_email(state)
         active_veh = get_active_vehicle(state)
-        active_plate = active_veh.get('plate', '86-369-79')
+        active_plate = active_veh.get('plate', '12-345-67')
+
+        tank_capacity = float(active_veh.get('tank_capacity', 50.0))
+        full_tank_refuel_km = int(active_veh.get('full_tank_refuel_km', 150000))
+        latest_km = int(active_veh.get('current_odometer', 150000))
+        avg_km_per_liter = float(active_veh.get('avg_km_per_liter', 14.0))
+        city_km_per_liter = float(active_veh.get('city_km_per_liter', 8.0))
+
+        # Default safe mock if sheet is not configured
+        if not spreadsheet_id:
+            month_names = ['ינואר', 'פברואר', 'מרץ', 'אפריל', 'מאי', 'יוני', 'יולי', 'אוגוסט', 'ספטמבר']
+            ins_record = state.get('insurance', {}).get(active_plate, DEFAULT_STATE['insurance'].get('12-345-67', {}))
+            maint_records = state.get('maintenance', {}).get(active_plate, [])
+            return {
+                'status': 'success',
+                'is_configured': False,
+                'message': 'Google Sheets עדיין לא הוגדר. אנא הזן מזהה או קישור לקובץ בהגדרות המערכת.',
+                'car': active_veh.get('car_model', 'רכב לדוגמה'),
+                'plate': active_plate,
+                'all_vehicles': state.get('vehicles', []),
+                'latest_km': latest_km,
+                'full_tank_refuel_km': full_tank_refuel_km,
+                'last_full_refuel_date': active_veh.get('last_full_refuel_date', '01/01/2027'),
+                'tank_capacity': tank_capacity,
+                'current_fuel_liters': tank_capacity,
+                'fuel_percent': 100.0,
+                'km_driven_since_full': 0,
+                'estimated_remaining_range': round(tank_capacity * avg_km_per_liter),
+                'city_range': round(tank_capacity * city_km_per_liter),
+                'total_spent_2026': 0.0,
+                'total_liters_2026': 0.0,
+                'refuel_count_2026': 0,
+                'avg_km_per_liter': avg_km_per_liter,
+                'city_km_per_liter': city_km_per_liter,
+                'avg_cost_per_km': 0.55,
+                'next_service_km': latest_km + 10000,
+                'service_remaining_km': 10000,
+                'monthly_labels': month_names,
+                'monthly_spends': [0.0] * len(month_names),
+                'monthly_liters': [0.0] * len(month_names),
+                'rate_dates': [],
+                'rate_values': [],
+                'recent_refuels': [],
+                'insurance': ins_record,
+                'insurance_days_remaining': 180,
+                'maintenance': maint_records,
+                'total_maintenance_cost': 0.0,
+                'test_expiry_date': active_veh.get('test_expiry_date', '2027-01-01'),
+                'test_days_remaining': 180,
+                'tire_size': active_veh.get('tire_size', '195/65R15'),
+                'morning_info': {
+                    'email': morning_email,
+                    'sent_count': 0,
+                    'sent_amount': 0.0,
+                    'total_receipts': 0
+                },
+                'tco': {
+                    'total_fuel': 0.0,
+                    'total_maintenance': 0.0,
+                    'annual_insurance': float(ins_record.get('annual_cost', 0.0)),
+                    'monthly_insurance': float(ins_record.get('monthly_cost', 0.0)),
+                    'total_annual_expenses': float(ins_record.get('annual_cost', 0.0)),
+                    'total_cost_per_km': 0.55
+                }
+            }
         
         creds = google_tools.get_credentials()
         service = build('sheets', 'v4', credentials=creds)
         
         # Get 2026 rows including Column I (Morning status)
         res_2026 = service.spreadsheets().values().get(
-            spreadsheetId=SPREADSHEET_ID,
+            spreadsheetId=spreadsheet_id,
             range='תדלוקים 2026!A2:I60'
         ).execute()
         rows_2026 = res_2026.get('values', [])
@@ -217,7 +338,6 @@ def get_fuel_data():
         entries_2026 = []
         total_spent_2026 = 0.0
         total_liters_2026 = 0.0
-        latest_km = int(active_veh.get('current_odometer', 162024))
         
         monthly_spend = {m: 0.0 for m in range(1, 13)}
         monthly_liters = {m: 0.0 for m in range(1, 13)}
@@ -231,7 +351,7 @@ def get_fuel_data():
             total_val = float(r[2].replace(',', '')) if len(r) > 2 and r[2] else 0.0
             liters_val = float(r[3].replace(',', '')) if len(r) > 3 and r[3] else 0.0
             rate_val = float(r[4].replace(',', '')) if len(r) > 4 and r[4] else 0.0
-            station_val = r[5] if len(r) > 5 else 'סונול'
+            station_val = r[5] if len(r) > 5 else 'תחנת דלק'
             receipt_url = r[6] if len(r) > 6 else ''
             pdf_url = r[7] if len(r) > 7 else ''
             morning_raw = r[8] if len(r) > 8 else ''
@@ -266,22 +386,16 @@ def get_fuel_data():
                 'morning_status': morning_status_text
             })
             
-        if latest_km > int(active_veh.get('current_odometer', 162024)):
+        if latest_km > int(active_veh.get('current_odometer', 150000)):
             active_veh['current_odometer'] = latest_km
             save_car_state(state)
 
-        avg_km_per_liter = float(active_veh.get('avg_km_per_liter', 14.24))
-        city_km_per_liter = float(active_veh.get('city_km_per_liter', 7.90))
-        
-        avg_rate = (total_spent_2026 / total_liters_2026) if total_liters_2026 > 0 else 7.75
+        avg_rate = (total_spent_2026 / total_liters_2026) if total_liters_2026 > 0 else 7.50
         fuel_cost_per_km = round(avg_rate / avg_km_per_liter, 2)
             
-        next_service_km = 163000
+        next_service_km = latest_km + 10000
         service_remaining_km = max(0, next_service_km - latest_km)
 
-        tank_capacity = float(active_veh.get('tank_capacity', 50.0))
-        full_tank_refuel_km = int(active_veh.get('full_tank_refuel_km', 162024))
-        
         km_driven_since_full = max(0, latest_km - full_tank_refuel_km)
         fuel_consumed_since_full = km_driven_since_full / avg_km_per_liter
         current_fuel_liters = max(0.0, min(tank_capacity, tank_capacity - fuel_consumed_since_full))
@@ -298,11 +412,11 @@ def get_fuel_data():
         rate_values = [e['rate'] for e in entries_2026]
         
         # Insurance & Maintenance & TCO
-        ins_record = state.get('insurance', {}).get(active_plate, DEFAULT_STATE['insurance']['86-369-79'])
-        maint_records = state.get('maintenance', {}).get(active_plate, DEFAULT_STATE['maintenance']['86-369-79'])
+        ins_record = state.get('insurance', {}).get(active_plate, DEFAULT_STATE['insurance'].get('12-345-67', {}))
+        maint_records = state.get('maintenance', {}).get(active_plate, DEFAULT_STATE['maintenance'].get('12-345-67', []))
         total_maint_cost = sum([r.get('cost', 0.0) for r in maint_records])
-        annual_insurance = float(ins_record.get('annual_cost', 3450.0))
-        monthly_insurance = float(ins_record.get('monthly_cost', 287.5))
+        annual_insurance = float(ins_record.get('annual_cost', 0.0))
+        monthly_insurance = float(ins_record.get('monthly_cost', 0.0))
         
         # Overall TCO (Total Cost of Ownership)
         total_annual_expenses = total_spent_2026 + total_maint_cost + annual_insurance
@@ -310,7 +424,7 @@ def get_fuel_data():
         # Calculate days until insurance expiry
         insurance_days_remaining = 0
         try:
-            end_dt = datetime.strptime(ins_record.get('end_date', '2026-12-31'), '%Y-%m-%d').date()
+            end_dt = datetime.strptime(ins_record.get('end_date', '2028-01-01'), '%Y-%m-%d').date()
             today = date.today()
             insurance_days_remaining = (end_dt - today).days
         except Exception:
@@ -319,19 +433,20 @@ def get_fuel_data():
         # Calculate days until test expiry
         test_days_remaining = 0
         try:
-            test_dt = datetime.strptime(active_veh.get('test_expiry_date', '2026-12-24'), '%Y-%m-%d').date()
+            test_dt = datetime.strptime(active_veh.get('test_expiry_date', '2027-01-01'), '%Y-%m-%d').date()
             test_days_remaining = (test_dt - date.today()).days
         except Exception:
             pass
 
         return {
             'status': 'success',
-            'car': active_veh.get('car_model', 'טויוטה קורולה GLI 2012 ידנית 1.6L'),
+            'is_configured': True,
+            'car': active_veh.get('car_model', 'רכב ראשי'),
             'plate': active_plate,
             'all_vehicles': state.get('vehicles', []),
             'latest_km': latest_km,
             'full_tank_refuel_km': full_tank_refuel_km,
-            'last_full_refuel_date': active_veh.get('last_full_refuel_date', '10/09/2026'),
+            'last_full_refuel_date': active_veh.get('last_full_refuel_date', '01/01/2027'),
             'tank_capacity': tank_capacity,
             'current_fuel_liters': round(current_fuel_liters, 1),
             'fuel_percent': fuel_percent,
@@ -356,11 +471,11 @@ def get_fuel_data():
             'insurance_days_remaining': insurance_days_remaining,
             'maintenance': maint_records,
             'total_maintenance_cost': total_maint_cost,
-            'test_expiry_date': active_veh.get('test_expiry_date', '2026-12-24'),
+            'test_expiry_date': active_veh.get('test_expiry_date', '2027-01-01'),
             'test_days_remaining': test_days_remaining,
             'tire_size': active_veh.get('tire_size', '195/65R15'),
             'morning_info': {
-                'email': MORNING_EXPENSE_EMAIL,
+                'email': morning_email,
                 'sent_count': sum(1 for e in entries_2026 if e.get('morning_sent')),
                 'sent_amount': round(sum(e['total'] for e in entries_2026 if e.get('morning_sent')), 2),
                 'total_receipts': len(entries_2026)
@@ -388,30 +503,43 @@ def send_receipt_to_morning(receipt_url, pdf_url=None, total=None, date=None, st
     from email.mime.text import MIMEText
     from email.mime.application import MIMEApplication
 
+    state = load_car_state()
+    spreadsheet_id = get_spreadsheet_id(state)
+    target_email = get_morning_expense_email(state)
+
+    if not target_email:
+        return {'success': False, 'message': 'כתובת מייל לעדכון הוצאות (Morning/רו״ח) לא הוגדרה. אנא הזן אותה בהגדרות המערכת.'}
+
     creds = google_tools.get_credentials()
-    service_sheets = build('sheets', 'v4', credentials=creds)
     service_gmail = build('gmail', 'v1', credentials=creds)
+    service_sheets = None
+    if spreadsheet_id:
+        try:
+            service_sheets = build('sheets', 'v4', credentials=creds)
+        except Exception:
+            service_sheets = None
 
     row_num = None
-    try:
-        res = service_sheets.spreadsheets().values().get(
-            spreadsheetId=SPREADSHEET_ID,
-            range="'תדלוקים 2026'!A2:I60"
-        ).execute()
-        rows = res.get('values', [])
-        for idx, r in enumerate(rows, start=2):
-            r_url = r[6] if len(r) > 6 else ''
-            r_pdf = r[7] if len(r) > 7 else ''
-            if (receipt_url and r_url == receipt_url) or (pdf_url and r_pdf == pdf_url):
-                row_num = idx
-                date = date or (r[0] if len(r) > 0 else '')
-                total = total or (r[2] if len(r) > 2 else '')
-                station = station or (r[5] if len(r) > 5 else 'סונול')
-                pdf_url = pdf_url or r_pdf
-                receipt_url = receipt_url or r_url
-                break
-    except Exception as e:
-        print(f"Sheet lookup warning: {e}")
+    if service_sheets and spreadsheet_id:
+        try:
+            res = service_sheets.spreadsheets().values().get(
+                spreadsheetId=spreadsheet_id,
+                range="'תדלוקים 2026'!A2:I60"
+            ).execute()
+            rows = res.get('values', [])
+            for idx, r in enumerate(rows, start=2):
+                r_url = r[6] if len(r) > 6 else ''
+                r_pdf = r[7] if len(r) > 7 else ''
+                if (receipt_url and r_url == receipt_url) or (pdf_url and r_pdf == pdf_url):
+                    row_num = idx
+                    date = date or (r[0] if len(r) > 0 else '')
+                    total = total or (r[2] if len(r) > 2 else '')
+                    station = station or (r[5] if len(r) > 5 else 'סונול')
+                    pdf_url = pdf_url or r_pdf
+                    receipt_url = receipt_url or r_url
+                    break
+        except Exception as e:
+            print(f"Sheet lookup warning: {e}")
 
     if not pdf_url:
         return {'success': False, 'message': 'לא נמצא קישור תקין לקובץ ה-PDF של הקבלה'}
@@ -431,13 +559,13 @@ def send_receipt_to_morning(receipt_url, pdf_url=None, total=None, date=None, st
     clean_total = str(total or '')
     clean_station = str(station or 'סונול')
 
-    # 2. Construct Email to Morning
+    # 2. Construct Email
     msg = MIMEMultipart()
-    msg['To'] = MORNING_EXPENSE_EMAIL
+    msg['To'] = target_email
     msg['From'] = GMAIL_SENDER_EMAIL
     msg['Subject'] = f"הוצאת דלק - {clean_station} - {clean_total} ש\"ח ({clean_date})"
 
-    body_text = f"""שלום למערכת מורנינג (Morning),
+    body_text = f"""שלום,
 
 מצורפת קבלה דיגיטלית של הוצאת דלק:
 - תחנת דלק: {clean_station}
@@ -479,10 +607,10 @@ def send_receipt_to_morning(receipt_url, pdf_url=None, total=None, date=None, st
     save_car_state(state)
 
     # 5. Persist in Google Sheet Column I
-    if row_num:
+    if row_num and service_sheets and spreadsheet_id:
         try:
             service_sheets.spreadsheets().values().update(
-                spreadsheetId=SPREADSHEET_ID,
+                spreadsheetId=spreadsheet_id,
                 range=f"'תדלוקים 2026'!I{row_num}",
                 valueInputOption='USER_ENTERED',
                 body={'values': [[f"נשלח ({datetime.now().strftime('%d/%m/%Y')})"]]}

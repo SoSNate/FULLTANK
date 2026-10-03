@@ -24,6 +24,10 @@ saved_flow.pickle
 *.jks
 *.keystore
 
+# Python cache
+__pycache__/
+*.pyc
+
 # Private car data
 car_state.json
 !car_state.example.json

@@ -27,13 +27,15 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class MainActivity extends AppCompatActivity {
-    private static final String DASHBOARD_URL = AppConfig.getDashboardUrl();
-    private static final String SPREADSHEET_URL = AppConfig.DEFAULT_SPREADSHEET_URL;
     private static final int PERM_REQUEST_CODE = 2026;
 
     private SwipeRefreshLayout swipeRefresh;
     private WebView webView;
     private boolean triggerKmOnLoad = false;
+
+    private String getDashboardUrl() {
+        return AppConfig.getDashboardUrl(this);
+    }
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -102,14 +104,55 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onReceivedError(WebView view, WebResourceRequest request, WebResourceError error) {
                 swipeRefresh.setRefreshing(false);
+                if (request.isForMainFrame()) {
+                    showServerConfigDialog();
+                }
             }
         });
 
-        String initialUrl = DASHBOARD_URL;
+        String initialUrl = getDashboardUrl();
         if (triggerKmOnLoad) {
             initialUrl += "?triggerKm=true";
         }
         webView.loadUrl(initialUrl);
+    }
+
+    private void showServerConfigDialog() {
+        if (isFinishing() || isDestroyed()) return;
+
+        android.widget.LinearLayout layout = new android.widget.LinearLayout(this);
+        layout.setOrientation(android.widget.LinearLayout.VERTICAL);
+        layout.setPadding(50, 30, 50, 10);
+
+        final android.widget.EditText inputUrl = new android.widget.EditText(this);
+        inputUrl.setHint("כתובת השרת (למשל http://192.168.1.50:5088)");
+        inputUrl.setText(AppConfig.getServerUrl(this));
+        layout.addView(inputUrl);
+
+        final android.widget.EditText inputToken = new android.widget.EditText(this);
+        inputToken.setHint("טוקן סודי (Secret Token)");
+        inputToken.setText(AppConfig.getSecretToken(this));
+        layout.addView(inputToken);
+
+        new androidx.appcompat.app.AlertDialog.Builder(this)
+                .setTitle("⚙️ הגדרת שרת FullTank")
+                .setMessage("לא ניתן להתחבר לשרת הנוכחי.\nאנא הזן את כתובת השרת והטוקן הסודי שלך:")
+                .setView(layout)
+                .setPositiveButton("שמור והתחבר", (d, which) -> {
+                    String newUrl = inputUrl.getText().toString().trim();
+                    String newToken = inputToken.getText().toString().trim();
+                    if (!newUrl.isEmpty()) {
+                        AppConfig.setServerUrl(MainActivity.this, newUrl);
+                    }
+                    if (!newToken.isEmpty()) {
+                        AppConfig.setSecretToken(MainActivity.this, newToken);
+                    }
+                    if (webView != null) {
+                        webView.loadUrl(getDashboardUrl());
+                    }
+                })
+                .setNegativeButton("ביטול", null)
+                .show();
     }
 
     private void openNativeSheets(String url) {
@@ -154,7 +197,7 @@ public class MainActivity extends AppCompatActivity {
         if (intent.getBooleanExtra("TRIGGER_KM_INPUT", false)) {
             triggerKmOnLoad = true;
             if (webView != null) {
-                webView.loadUrl(DASHBOARD_URL + "?triggerKm=true&t=" + System.currentTimeMillis());
+                webView.loadUrl(getDashboardUrl() + "?triggerKm=true&t=" + System.currentTimeMillis());
                 webView.postDelayed(() -> {
                     webView.evaluateJavascript("if (typeof openOdometerSheet === 'function') openOdometerSheet(true);", null);
                 }, 600);
@@ -176,7 +219,7 @@ public class MainActivity extends AppCompatActivity {
 
         builder.setPositiveButton("✅ כן, תדלקתי", (dialog, which) -> {
             if (webView != null) {
-                webView.loadUrl(DASHBOARD_URL + "?triggerKm=true&creditStation=" + Uri.encode(station) + "&creditAmount=" + amount);
+                webView.loadUrl(getDashboardUrl() + "?triggerKm=true&creditStation=" + Uri.encode(station) + "&creditAmount=" + amount);
             }
         });
 
@@ -266,7 +309,14 @@ public class MainActivity extends AppCompatActivity {
 
         @JavascriptInterface
         public void openSheets() {
-            openNativeSheets(SPREADSHEET_URL);
+            openNativeSheets(AppConfig.getSpreadsheetUrl(mContext));
+        }
+
+        @JavascriptInterface
+        public void setServerConfig(String serverUrl, String secretToken, String spreadsheetUrl) {
+            if (serverUrl != null && !serverUrl.isEmpty()) AppConfig.setServerUrl(mContext, serverUrl);
+            if (secretToken != null && !secretToken.isEmpty()) AppConfig.setSecretToken(mContext, secretToken);
+            if (spreadsheetUrl != null && !spreadsheetUrl.isEmpty()) AppConfig.setSpreadsheetUrl(mContext, spreadsheetUrl);
         }
 
         @JavascriptInterface
